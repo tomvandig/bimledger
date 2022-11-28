@@ -83,8 +83,8 @@ interface DefinitionsDelta
 
 interface TransactionDelta
 {
-    components: ComponentsDelta | null;
-    definitions: DefinitionsDelta | null;
+    components: ComponentsDelta;
+    definitions: DefinitionsDelta;
 }
 
 interface Transaction
@@ -211,16 +211,16 @@ function MakeModifiedComponent(left: Component, right: Component, schemaMap: any
         return false;
     }
 
-    let schema = schemaMap[ComponentTypeToString(left.type)] as ComponentSchema;
+    let componentDefinition = schemaMap[ComponentTypeToString(left.type)] as ComponentDefinition;
 
-    if (!schema)
+    if (!componentDefinition)
     {
-        throw new Error(`Component type without schema ${ComponentTypeToString(left.type)}`);
+        throw new Error(`Component type without definition ${ComponentTypeToString(left.type)}`);
     }
 
     let ccomp: ModifiedComponent = {
         ref: left.ref, // left is source of truth
-        modifications: BuildModifications(left, right, schema)
+        modifications: BuildModifications(left, right, componentDefinition.schema)
     }
 
     return ccomp;
@@ -231,23 +231,39 @@ function BuildSchemaMap(ecs: ECS)
     let defs = {};
     
     ecs.definitions.forEach((def) => {
-        defs[ComponentTypeToString(def.id)] = def.schema;
+        defs[ComponentTypeToString(def.id)] = def;
     })
 
     return defs;
 }
 
-function MergeSchemaMap(left: any, right: any)
+function MergeSchemaMap(left: any, right: any, delta: DefinitionsDelta)
 {
     // TODO: look for inconsistencies
     let merge = {};
     Object.keys(left).forEach((key) => {
-        let l = left[key];
+        let l = left[key] as ComponentDefinition;
+        let r = right[key] as ComponentDefinition;
+
         merge[key] = l; 
+
+        if (!r)
+        {
+            // removed
+            delta.expired.push({ id: l.id } as ExpiredComponent)
+        }
     });
     Object.keys(right).forEach((key) => {
-        let l = right[key];
-        merge[key] = l; 
+        let l = left[key] as ComponentDefinition;
+        let r = right[key] as ComponentDefinition;
+        
+        merge[key] = l;
+        
+        if (!l)
+        {
+            // added
+            delta.created.push(r);
+        }
     });
     return merge;
 }
@@ -264,7 +280,11 @@ function DiffECS(left: ECS, right: ECS): Transaction
     let schemaMapLeft = BuildSchemaMap(left);
     let schemaMapRight = BuildSchemaMap(right);
 
-    let schemaMap = MergeSchemaMap(schemaMapLeft, schemaMapRight);
+    let definitionsDelta: DefinitionsDelta = {
+        created: [],
+        expired: []
+    };
+    let schemaMap = MergeSchemaMap(schemaMapLeft, schemaMapRight, definitionsDelta);
 
     let matchingGuids: string[] = [];
     let addedGuids: string[] = [];
@@ -311,7 +331,7 @@ function DiffECS(left: ECS, right: ECS): Transaction
 
     let delta: TransactionDelta = {
         components: componentsDelta,
-        definitions: null
+        definitions: definitionsDelta
     }
 
     let transaction: Transaction = {
@@ -346,9 +366,11 @@ function BuildComponent(ccomp: CreatedComponent)
 
 function ApplyTransaction(ecs: ECS, transaction: Transaction)
 {
-    // transaction.delta.definitions.created.forEach((addedComponent) => {
-    //     ecs.components.push(BuildComponent(addedComponent));
-    // });
+    transaction.delta.definitions.created.forEach((definition) => {
+        ecs.definitions.push(definition);
+    });
+
+    // TODO: component expiration!
 
     // note that refmap is created before added components
     let refMap = BuildRefMap(ecs);
