@@ -1,0 +1,26 @@
+{
+  "name": "bimledger",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "watch": {
+    "build-cli": {
+      "patterns": [
+        "./"
+      ],
+      "extensions": "ts"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build-cli": "esbuild bl_cli.ts --bundle --outfile=bundle.js && node bundle.js",
+    "watch": "npm-watch"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "esbuild": "^0.15.15",
+    "npm-watch": "^0.11.0",
+    "spark-md5": "^3.0.2"
+  }
+}
