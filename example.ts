@@ -9,7 +9,7 @@ export let ECS1 = {
                 {
                     name: "coordinates",
                     value: {
-                        type: 1, // array
+                        type: 2, // array
                         child: {
                             type: 0, // number   
                             child: null
@@ -36,7 +36,7 @@ export let ECS2 = {
                 {
                     name: "coordinates",
                     value: {
-                        type: 1, // array
+                        type: 2, // array
                         child: {
                             type: 0, // number   
                             child: null

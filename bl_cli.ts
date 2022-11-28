@@ -166,7 +166,20 @@ function attributeValueEqual(left: any, right: any, attrValue: ComponentAttribut
     if (attrValue.type === ComponentAttributeType.ARRAY)
     {
         // good luck
-        return false;
+        if (left.length !== right.length)
+        {
+            return false;
+        }
+
+        for (let i = 0; i < left.length; i++)
+        {
+            if (!attributeValueEqual(left[i], right[i], attrValue.child))
+            {
+                return false;
+            }
+        }
+        
+        return true;
     }
     else
     {
