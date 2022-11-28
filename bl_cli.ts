@@ -149,6 +149,15 @@ function BuildGuidMap(ecs: ECS)
     return map;
 }
 
+function BuildHashMap(ecs: ECS)
+{
+    let map = {};
+    ecs.components.forEach(comp => {
+        map[comp.hash] = comp.ref;
+    });
+    return map;
+}
+
 function MakeCreatedComponent(comp: Component, ref: Reference)
 {
     let ccomp: CreatedComponent = {
@@ -178,7 +187,7 @@ function attributeValueEqual(left: any, right: any, attrValue: ComponentAttribut
                 return false;
             }
         }
-        
+
         return true;
     }
     else
@@ -289,6 +298,8 @@ function DiffECS(left: ECS, right: ECS): Transaction
     let refMapRight = BuildRefMap(right);
     let guidsLeft = BuildGuidMap(left);
     let guidsRight = BuildGuidMap(right);
+    let hashMapLeft = BuildHashMap(left);
+    let hashMapRight = BuildHashMap(right);
 
     let schemaMapLeft = BuildSchemaMap(left);
     let schemaMapRight = BuildSchemaMap(right);
@@ -364,6 +375,12 @@ function Rehash(comp: Component)
     comp.hash = spark.hash(JSON.stringify([comp.guid, comp.type, comp.data]));
 }
 
+function RehashECS(ecs: ECS)
+{
+    ecs.components.forEach(Rehash);
+    return ecs;
+}
+
 function BuildComponent(ccomp: CreatedComponent)
 {
     let comp: Component = {
@@ -429,8 +446,8 @@ function BuildECS(ledger: Ledger)
     return ecs;
 }
 
-let e1 = ECS1 as ECS;
-let e2 = ECS2 as ECS;
+let e1 = RehashECS(ECS1 as ECS);
+let e2 = RehashECS(ECS2 as ECS);
 
 let ledger: Ledger = {
     transactions: []
