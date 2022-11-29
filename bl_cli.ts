@@ -153,7 +153,10 @@ function BuildHashMap(ecs: ECS)
 {
     let map = {};
     ecs.components.forEach(comp => {
-        map[comp.hash] = comp.ref;
+        if (!comp.guid)
+        {
+            map[comp.hash] = comp.ref;
+        }
     });
     return map;
 }
@@ -313,6 +316,37 @@ function DiffECS(left: ECS, right: ECS): Transaction
     let matchingGuids: string[] = [];
     let addedGuids: string[] = [];
     let removedGuids: string[] = [];
+    
+    let matchingHashes: string[] = [];
+    let addedHashes: string[] = [];
+    let removedHashes: string[] = [];
+
+    // check left for status quo
+    Object.keys(hashMapLeft).forEach((hash) => {
+        if (hashMapRight[hash])
+        {
+            // match!
+            matchingHashes.push(hash);
+        }
+        else
+        {
+            // no match, removed!
+            removedHashes.push(hash);
+        }
+    });
+
+    // check right for added
+    Object.keys(hashMapRight).forEach((hash) => {
+        if (hashMapLeft[hash])
+        {
+            // match, but already processed!
+        }
+        else
+        {
+            // no match, added!
+            addedHashes.push(hash);
+        }
+    });
 
     // check left for status quo
     Object.keys(guidsLeft).forEach((guid) => {
@@ -340,17 +374,29 @@ function DiffECS(left: ECS, right: ECS): Transaction
             addedGuids.push(guid);
         }
     });
+    
+    console.log(`hash matches: ${matchingHashes}`);
+    console.log(`hash added: ${addedHashes}`);
+    console.log(`hash removed: ${removedHashes}`);
 
-    console.log(`matches: ${matchingGuids}`);
-    console.log(`added: ${addedGuids}`);
-    console.log(`removed: ${removedGuids}`);
+    console.log(`guids matches: ${matchingGuids}`);
+    console.log(`guids added: ${addedGuids}`);
+    console.log(`guids removed: ${removedGuids}`);
 
     let allModifiedComponents = matchingGuids.map((guid) => MakeModifiedComponent(refMapLeft[guidsLeft[guid]], refMapRight[guidsRight[guid]], schemaMap));
+    // filter out nulls
+    allModifiedComponents = allModifiedComponents.filter(m => m) as ModifiedComponent[]
+    
+    let allAddedComponents = addedGuids.map((guid) => MakeCreatedComponent(refMapRight[guidsRight[guid]], nextRef++));
+    allAddedComponents = [...allAddedComponents, ...addedHashes.map((hash) => MakeCreatedComponent(refMapRight[hashMapRight[hash]], nextRef++))];
+
+    let allRemovedComponents = removedGuids.map((guid) => guidsLeft[guid]);
+    allRemovedComponents = [...allRemovedComponents, ...removedHashes.map((hash) => hashMapLeft[hash])];
 
     let componentsDelta: ComponentsDelta = {
-        added: addedGuids.map((guid) => MakeCreatedComponent(refMapRight[guidsRight[guid]], nextRef++)),
-        modified: allModifiedComponents.filter(m => m) as ModifiedComponent[],
-        removed: removedGuids.map((guid) => guidsLeft[guid])
+        added: allAddedComponents,
+        modified: allModifiedComponents,
+        removed: allRemovedComponents
     }
 
     let delta: TransactionDelta = {
