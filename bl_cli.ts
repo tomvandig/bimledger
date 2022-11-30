@@ -96,7 +96,7 @@ interface Transaction
     delta: TransactionDelta;
 }
 
-interface Ledger 
+export interface Ledger 
 {
     transactions: Transaction[];
 }
@@ -110,10 +110,27 @@ interface Component
     data: any;   
 }
 
-interface ECS
+export class ECS
 {
     definitions: ComponentDefinition[];
     components: Component[];
+
+    constructor(defs: ComponentDefinition[], comps: Component[])
+    {
+        this.definitions = defs;
+        this.components = comps;
+    }
+
+
+    GetComponentByRef(ref: Reference)
+    {
+        return this.components.filter(c => c.ref === ref)[0];
+    }
+    
+    GetComponentByGuid(guid: string)
+    {
+        return this.components.filter(c => c.guid === guid)[0];
+    }
 }
 
 
@@ -293,7 +310,7 @@ function MergeSchemaMap(left: any, right: any, delta: DefinitionsDelta)
     return merge;
 }
 
-function DiffECS(left: ECS, right: ECS): Transaction
+export function DiffECS(left: ECS, right: ECS): Transaction
 {
     let nextRef = GetMaxRef(left) + 1;
 
@@ -421,7 +438,7 @@ function Rehash(comp: Component)
     comp.hash = spark.hash(JSON.stringify([comp.guid, comp.type, comp.data]));
 }
 
-function RehashECS(ecs: ECS)
+export function RehashECS(ecs: ECS)
 {
     ecs.components.forEach(Rehash);
     return ecs;
@@ -476,12 +493,9 @@ function ApplyTransaction(ecs: ECS, transaction: Transaction)
     });
 }
 
-function BuildECS(ledger: Ledger)
+export function BuildECS(ledger: Ledger)
 {
-    let ecs: ECS = {
-        definitions: [],
-        components: []
-    }
+    let ecs = new ECS([], []);
 
     ledger.transactions.forEach((transaction) => {
         ApplyTransaction(ecs, transaction);
@@ -491,21 +505,3 @@ function BuildECS(ledger: Ledger)
 
     return ecs;
 }
-
-let e1 = RehashECS(ECS1 as ECS);
-let e2 = RehashECS(ECS2 as ECS);
-
-let ledger: Ledger = {
-    transactions: []
-}
-
-ledger.transactions.push(DiffECS({ components: [], definitions: [] }, e1));
-let ecs1 = BuildECS(ledger)
-ledger.transactions.push(DiffECS(ecs1, e2));
-
-console.log(JSON.stringify(ledger.transactions, null, 4));
-
-let ecs = BuildECS(ledger);
-
-console.log(JSON.stringify(ecs, null, 4));
-
