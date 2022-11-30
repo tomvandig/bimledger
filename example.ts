@@ -1,18 +1,39 @@
+import { ComponentAttributeType } from "./bl_cli";
 
-export function GetExampleDefinition()
+export function GetExamplePropDefinition()
 {
     return {
-        id: ["ifc23", "ifccartesianpoint"],
+        id: ["ifc23", "ifcproperty"],
         parent: null,
         ownership: "any",
         schema: {
             attributes: [
                 {
-                    name: "coordinates",
+                    name: "name",
                     value: {
-                        type: 2, // array
+                        type: ComponentAttributeType.STRING,
+                        child: null
+                    }
+                }
+            ]
+        }
+    };
+}
+
+export function GetExamplePropSetDefinition()
+{
+    return {
+        id: ["ifc23", "ifcpropertyset"],
+        parent: null,
+        ownership: "any",
+        schema: {
+            attributes: [
+                {
+                    name: "properties",
+                    value: {
+                        type: ComponentAttributeType.ARRAY,
                         child: {
-                            type: 0, // number   
+                            type: ComponentAttributeType.REF,
                             child: null
                         }
                     }

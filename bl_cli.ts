@@ -1,8 +1,14 @@
-import { ECS1, ECS2 } from "./example";
 import * as spark from "spark-md5";
 
 type Reference = number;
 type ComponentType = string[];
+
+let verbose = false;
+
+export function SetVerbose(v: boolean)
+{
+    verbose = v;
+}
 
 function ComponentTypeToString(type: ComponentType)
 {
@@ -36,7 +42,7 @@ interface ComponentsDelta
     removed: Reference[];
 }
 
-enum ComponentAttributeType
+export enum ComponentAttributeType
 {
     NUMBER,
     STRING,
@@ -392,13 +398,16 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         }
     });
     
-    console.log(`hash matches: ${matchingHashes}`);
-    console.log(`hash added: ${addedHashes}`);
-    console.log(`hash removed: ${removedHashes}`);
+    if (verbose)
+    {
+        console.log(`hash matches: ${matchingHashes}`);
+        console.log(`hash added: ${addedHashes}`);
+        console.log(`hash removed: ${removedHashes}`);
 
-    console.log(`guids matches: ${matchingGuids}`);
-    console.log(`guids added: ${addedGuids}`);
-    console.log(`guids removed: ${removedGuids}`);
+        console.log(`guids matches: ${matchingGuids}`);
+        console.log(`guids added: ${addedGuids}`);
+        console.log(`guids removed: ${removedGuids}`);
+    }
 
     let allModifiedComponents = matchingGuids.map((guid) => MakeModifiedComponent(refMapLeft[guidsLeft[guid]], refMapRight[guidsRight[guid]], schemaMap));
     // filter out nulls

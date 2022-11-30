@@ -1,34 +1,34 @@
 
 import { expect } from 'chai';
-import { BuildECS, DiffECS, ECS, Ledger, RehashECS } from './bl_cli';
+import { BuildECS, DiffECS, ECS, Ledger, RehashECS, SetVerbose } from './bl_cli';
 import { describe, it } from "./crappucino";
-import { GetExampleDefinition, GetExampleObject } from './example';
+import { GetExampleObject, GetExamplePropDefinition, GetExamplePropSetDefinition } from './example';
 
-describe('Array', function () {
-  describe('#indexOf()', function () {
-    it('should return -1 when the value is not present', function () {
+describe('Integration Tests', function () {
+  describe('Diff two ecs files', function () {
+    it('Constructed ECS should reflect changes of both files', function () {
 
-        let def = GetExampleDefinition();
+        let propDef = GetExamplePropDefinition();
 
         let ECS1 = {
-            definitions: [def],
+            definitions: [propDef],
             components: [
-                GetExampleObject(41, "1", def, { coordinates: [28, 30, 1] }),
-                GetExampleObject(42, "2", def, { coordinates: [28, 30, 2] }),
-                GetExampleObject(43, "3", def, { coordinates: [28, 30, 3] }),
-                GetExampleObject(44, null, def, { coordinates: [1, 1, 1] }),
-                GetExampleObject(45, null, def, { coordinates: [1, 1, 2] })
+                GetExampleObject(41, "1", propDef, { name: "myprop1" }),
+                GetExampleObject(42, "2", propDef, { name: "myprop2" }),
+                GetExampleObject(43, "3", propDef, { name: "myprop3" }),
+                GetExampleObject(44, null, propDef, { name: "width" }),
+                GetExampleObject(45, null, propDef, { name: "height" })
             ]
         };
         
         let ECS2 = {
-            definitions: [def],
+            definitions: [propDef],
             components: [
-                GetExampleObject(41, "1", def, { coordinates: [28, 30, 4] }),
-                GetExampleObject(42, "2", def, { coordinates: [28, 30, 5] }),
-                GetExampleObject(44, "4", def, { coordinates: [28, 30, 6] }),
-                GetExampleObject(45, null, def, { coordinates: [1, 1, 1] }),
-                GetExampleObject(46, null, def, { coordinates: [1, 2, 3] })
+                GetExampleObject(41, "1", propDef, { name: "myprop4" }),
+                GetExampleObject(42, "2", propDef, { name: "myprop5" }),
+                GetExampleObject(44, "4", propDef, { name: "myprop6" }),
+                GetExampleObject(45, null, propDef, { name: "width" }),
+                GetExampleObject(46, null, propDef, { name: "length" })
             ]
         };
 
@@ -39,18 +39,21 @@ describe('Array', function () {
             transactions: []
         }
         
+
+        SetVerbose(false);
         ledger.transactions.push(DiffECS(new ECS([], []), e1));
         let ecs1 = BuildECS(ledger)
         ledger.transactions.push(DiffECS(ecs1, e2));
         
-        console.log(JSON.stringify(ledger.transactions, null, 4));
-        
         let ecs = BuildECS(ledger);
-        
-        console.log(JSON.stringify(ecs, null, 4));
 
-        expect(ecs.GetComponentByGuid("1")).to.not.be.null;
-        
+        expect(ecs.GetComponentByGuid("1")).to.not.be.undefined;
+        expect(ecs.GetComponentByGuid("2")).to.not.be.undefined;
+        expect(ecs.GetComponentByGuid("3")).to.be.undefined;
+        expect(ecs.GetComponentByGuid("4")).to.not.be.undefined;
+
+        expect(ecs.GetComponentByRef(4)).to.not.be.undefined;
+        expect(ecs.GetComponentByRef(7)).to.not.be.undefined;
     });
   });
 });
