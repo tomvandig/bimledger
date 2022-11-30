@@ -5,6 +5,7 @@ let path = [];
 export function describe(name: string, fn: any)
 {
     path.push(name);
+    console.log(` [  ] ${path.join("::")}`);
     fn();
     path.pop();
 }

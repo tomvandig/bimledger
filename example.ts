@@ -47,3 +47,36 @@ export function GetExampleObject(ref: number, guid: string | null, def: any, dat
 {
     return { ref, hash: "h", guid, type: def.id, data };
 }
+
+/*
+    NUMBER,
+    STRING,
+    ARRAY,
+    LABEL,
+    REF
+*/
+
+export function MakeNumber(num: number)
+{
+    return num;
+}
+
+export function MakeRef(num: number)
+{
+    return num;
+}
+
+export function MakeString(str: String)
+{
+    return str;
+}
+
+export function MakeLabel(str: String)
+{
+    return str;
+}
+
+export function MakeArray(a: any[])
+{
+    return a;
+}

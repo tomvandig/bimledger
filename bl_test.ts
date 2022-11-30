@@ -2,7 +2,7 @@
 import { expect } from 'chai';
 import { BuildECS, DiffECS, ECS, Ledger, RehashECS, SetVerbose } from './bl_cli';
 import { describe, it } from "./crappucino";
-import { GetExampleObject, GetExamplePropDefinition, GetExamplePropSetDefinition } from './example';
+import { GetExampleObject, GetExamplePropDefinition, GetExamplePropSetDefinition, MakeString } from './example';
 
 describe('Integration Tests', function () {
   describe('Diff two ecs files', function () {
@@ -13,22 +13,22 @@ describe('Integration Tests', function () {
         let ECS1 = {
             definitions: [propDef],
             components: [
-                GetExampleObject(41, "1", propDef, { name: "myprop1" }),
-                GetExampleObject(42, "2", propDef, { name: "myprop2" }),
-                GetExampleObject(43, "3", propDef, { name: "myprop3" }),
-                GetExampleObject(44, null, propDef, { name: "width" }),
-                GetExampleObject(45, null, propDef, { name: "height" })
+                GetExampleObject(41, "1", propDef, { name: MakeString("myprop1") }),
+                GetExampleObject(42, "2", propDef, { name: MakeString("myprop2") }),
+                GetExampleObject(43, "3", propDef, { name: MakeString("myprop3") }),
+                GetExampleObject(44, null, propDef, { name: MakeString("width") }),
+                GetExampleObject(45, null, propDef, { name: MakeString("height") })
             ]
         };
         
         let ECS2 = {
             definitions: [propDef],
             components: [
-                GetExampleObject(41, "1", propDef, { name: "myprop4" }),
-                GetExampleObject(42, "2", propDef, { name: "myprop5" }),
-                GetExampleObject(44, "4", propDef, { name: "myprop6" }),
-                GetExampleObject(45, null, propDef, { name: "width" }),
-                GetExampleObject(46, null, propDef, { name: "length" })
+                GetExampleObject(41, "1", propDef, { name: MakeString("myprop4") }),
+                GetExampleObject(42, "2", propDef, { name: MakeString("myprop5") }),
+                GetExampleObject(44, "4", propDef, { name: MakeString("myprop6") }),
+                GetExampleObject(45, null, propDef, { name: MakeString("width") }),
+                GetExampleObject(46, null, propDef, { name: MakeString("length") })
             ]
         };
 
