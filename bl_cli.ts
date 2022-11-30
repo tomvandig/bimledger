@@ -409,9 +409,9 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         console.log(`guids removed: ${removedGuids}`);
     }
 
-    let allModifiedComponents = matchingGuids.map((guid) => MakeModifiedComponent(refMapLeft[guidsLeft[guid]], refMapRight[guidsRight[guid]], schemaMap));
+    let allModifiedComponents = matchingGuids.map((guid) => MakeModifiedComponent(refMapLeft[guidsLeft[guid]], refMapRight[guidsRight[guid]], schemaMap)) as ModifiedComponent[];
     // filter out nulls
-    allModifiedComponents = allModifiedComponents.filter(m => m) as ModifiedComponent[]
+    allModifiedComponents = allModifiedComponents.filter(m => m) as ModifiedComponent[];
     
     let allAddedComponents = addedGuids.map((guid) => MakeCreatedComponent(refMapRight[guidsRight[guid]], nextRef++));
     allAddedComponents = [...allAddedComponents, ...addedHashes.map((hash) => MakeCreatedComponent(refMapRight[hashMapRight[hash]], nextRef++))];
