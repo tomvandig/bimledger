@@ -42,6 +42,18 @@ interface ComponentsDelta
     removed: Reference[];
 }
 
+export interface ComponentAttributeInstance
+{
+    type: ComponentAttributeType;
+    val: any;
+}
+
+export interface NamedComponentAttributeInstance
+{
+    name: string;
+    val: ComponentAttributeInstance;
+}
+
 export enum ComponentAttributeType
 {
     NUMBER,
@@ -107,13 +119,13 @@ export interface Ledger
     transactions: Transaction[];
 }
 
-interface Component
+export interface Component
 {
     ref: Reference;
     hash: string;
     guid: null | string;
     type: ComponentType;
-    data: any;   
+    data: NamedComponentAttributeInstance[];   
 }
 
 export class ECS
@@ -196,19 +208,29 @@ function MakeCreatedComponent(comp: Component, ref: Reference)
     return ccomp;
 }
 
-function attributeValueEqual(left: any, right: any, attrValue: ComponentAttributeValue)
+function attributeValueEqual(left: ComponentAttributeInstance, right: ComponentAttributeInstance, attrValue: ComponentAttributeValue)
 {
+    if (attrValue.type !== left.type)
+    {
+        throw new Error(`Type ${attrValue.type} does not match left type ${left.type}`)
+    }
+    
+    if (attrValue.type !== right.type)
+    {
+        throw new Error(`Type ${attrValue.type} does not match right type ${right.type}`)
+    }
+
     if (attrValue.type === ComponentAttributeType.ARRAY)
     {
         // good luck
-        if (left.length !== right.length)
+        if (left.val.length !== right.val.length)
         {
             return false;
         }
 
-        for (let i = 0; i < left.length; i++)
+        for (let i = 0; i < left.val.length; i++)
         {
-            if (!attributeValueEqual(left[i], right[i], attrValue.child))
+            if (!attributeValueEqual(left.val[i], right.val[i], attrValue.child))
             {
                 return false;
             }
@@ -218,15 +240,25 @@ function attributeValueEqual(left: any, right: any, attrValue: ComponentAttribut
     }
     else
     {
-        return left === right; // let's pretend we don't care about the details here
+        return left.val === right.val; // let's pretend we don't care about the details here
     }
 }
 
-function attributeEqual(left: any, right: any, attr: ComponentAttribute)
+function GetAttrByName(name: string, comp: Component)
 {
-    if (left[attr.name] && right[attr.name])
+    let attrs = comp.data.filter((ncai) => ncai.name === name); 
+    if (attrs.length === 0) return false;
+    return attrs[0];
+}
+
+function attributeEqual(left: Component, right: Component, attr: ComponentAttribute)
+{
+    let l = GetAttrByName(attr.name, left);
+    let r = GetAttrByName(attr.name, right);
+
+    if (l && r)
     {
-        return attributeValueEqual(left[attr.name], right[attr.name], attr.value);
+        return attributeValueEqual(l.val, r.val, attr.value);
     }
     else
     {
@@ -244,7 +276,7 @@ function BuildModifications(left: Component, right: Component, schema: Component
 {
     let modifications: ComponentModification[] = [];
     schema.attributes.forEach((attr) => {
-        if (!attributeEqual(left.data, right.data, attr))
+        if (!attributeEqual(left, right, attr))
         {
             modifications.push({ attributeName: attr.name, newValue: right.data[attr.name] } as ComponentModification)
         }
@@ -298,7 +330,12 @@ function MergeSchemaMap(left: any, right: any, delta: DefinitionsDelta)
         if (!r)
         {
             // removed
+            if (verbose) console.log(`Removed ${key}`);
             delta.expired.push({ id: l.id } as ExpiredComponent)
+        }
+        else
+        {
+            if (verbose) console.log(`Skipped ${key}`);
         }
     });
     Object.keys(right).forEach((key) => {
@@ -310,10 +347,59 @@ function MergeSchemaMap(left: any, right: any, delta: DefinitionsDelta)
         if (!l)
         {
             // added
+            if (verbose) console.log(`Added ${key}`);
             delta.created.push(r);
+        }
+        else
+        {
+            if (verbose) console.log(`Skipped ${key}`);
         }
     });
     return merge;
+}
+
+function GetRefs(attr: ComponentAttributeInstance, references: Reference[])
+{
+    if (attr.type === ComponentAttributeType.REF)
+    {
+        references.push(attr.val);
+    }
+    else if (attr.type === ComponentAttributeType.ARRAY)
+    {
+        attr.val.forEach((ncai) => GetRefs(ncai, references));
+    }
+    else
+    {
+        // other types arent refs ever
+        return;
+    }
+}
+
+
+function GetRefsFromComponent(comp: Component)
+{
+    let refs: Reference[] = [];
+    comp.data.forEach((ncai) => {
+        GetRefs(ncai.val, refs);
+    })
+    return refs;
+}
+
+function BuildReferenceTree(ecs: ECS)
+{
+    let depthMap = {};
+    let forRefs = {};
+    let backRefs = {};
+
+    ecs.components.forEach((comp) => {
+        let refs = GetRefsFromComponent(comp);
+        forRefs[comp.ref] = refs;
+
+        refs.forEach((ref) => {
+            if (!backRefs[ref]) backRefs[ref] = [];
+            backRefs[ref].push(comp.ref);
+        });
+    });
 }
 
 export function DiffECS(left: ECS, right: ECS): Transaction
@@ -326,6 +412,9 @@ export function DiffECS(left: ECS, right: ECS): Transaction
     let guidsRight = BuildGuidMap(right);
     let hashMapLeft = BuildHashMap(left);
     let hashMapRight = BuildHashMap(right);
+
+    BuildReferenceTree(left);
+    BuildReferenceTree(right);
 
     let schemaMapLeft = BuildSchemaMap(left);
     let schemaMapRight = BuildSchemaMap(right);

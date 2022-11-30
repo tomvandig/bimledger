@@ -1,4 +1,4 @@
-import { ComponentAttributeType } from "./bl_cli";
+import { Component, ComponentAttributeInstance, ComponentAttributeType, NamedComponentAttributeInstance } from "./bl_cli";
 
 export function GetExamplePropDefinition()
 {
@@ -43,9 +43,9 @@ export function GetExamplePropSetDefinition()
     };
 }
 
-export function GetExampleObject(ref: number, guid: string | null, def: any, data: any)
+export function GetExampleObject(ref: number, guid: string | null, def: any, data: NamedComponentAttributeInstance[])
 {
-    return { ref, hash: "h", guid, type: def.id, data };
+    return { ref, hash: "h", guid, type: def.id, data } as Component;
 }
 
 /*
@@ -56,27 +56,32 @@ export function GetExampleObject(ref: number, guid: string | null, def: any, dat
     REF
 */
 
+export function MakeAttr(name: string, val: ComponentAttributeInstance)
+{
+    return {name, val} as NamedComponentAttributeInstance;
+}
+
 export function MakeNumber(num: number)
 {
-    return num;
+    return { type: ComponentAttributeType.NUMBER, val: num } as ComponentAttributeInstance;
 }
 
 export function MakeRef(num: number)
 {
-    return num;
+    return { type: ComponentAttributeType.REF, val: num } as ComponentAttributeInstance;
 }
 
 export function MakeString(str: String)
 {
-    return str;
+    return { type: ComponentAttributeType.STRING, val: str } as ComponentAttributeInstance;
 }
 
 export function MakeLabel(str: String)
 {
-    return str;
+    return { type: ComponentAttributeType.LABEL, val: str } as ComponentAttributeInstance;
 }
 
 export function MakeArray(a: any[])
 {
-    return a;
+    return { type: ComponentAttributeType.ARRAY, val: a } as ComponentAttributeInstance;
 }
