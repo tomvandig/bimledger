@@ -39,11 +39,10 @@ describe('Integration Tests', function () {
                 transactions: []
             }
             
-
             ledger.transactions.push(DiffECS(new ECS([], []), e1));
             let ecs1 = BuildECS(ledger)
             ledger.transactions.push(DiffECS(ecs1, e2));
-            
+
             let ecs = BuildECS(ledger);
 
             expect(ecs.GetComponentByGuid("1")).to.not.be.undefined;

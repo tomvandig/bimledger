@@ -165,7 +165,7 @@ function GetMaxRef(ecs: ECS)
 
 function BuildRefMap(ecs: ECS)
 {
-    let map = {};
+    let map: {[index: number]:Component} = {};
     ecs.components.forEach(comp => {
         map[comp.ref] = comp;
     });
@@ -174,7 +174,7 @@ function BuildRefMap(ecs: ECS)
 
 function BuildGuidMap(ecs: ECS)
 {
-    let map = {};
+    let map: {[index: string]:number} = {};
     ecs.components.forEach(comp => {
         if (comp.guid)
         {
@@ -184,12 +184,34 @@ function BuildGuidMap(ecs: ECS)
     return map;
 }
 
+function HashComponent(comp: Component, ecs: ECS)
+{
+    let hash = [comp.guid, ...comp.type];
+    VisitAttributes(comp, (attr: ComponentAttributeInstance) => {
+        if (attr.type !== ComponentAttributeType.ARRAY)
+        {
+            if (attr.type === ComponentAttributeType.REF)
+            {
+                let comp = ecs.GetComponentByRef(attr.val);
+                hash.push(HashComponent(comp, ecs));
+            }
+            else
+            {
+                hash.push(attr.val);
+            }
+        }
+    })
+
+    return spark.hash(hash.join(","));
+}
+
 function BuildHashMap(ecs: ECS)
 {
     let map = {};
     ecs.components.forEach(comp => {
         if (!comp.guid)
         {
+            comp.hash = HashComponent(comp, ecs);
             map[comp.hash] = comp.ref;
         }
     });
@@ -278,7 +300,11 @@ function BuildModifications(left: Component, right: Component, schema: Component
     schema.attributes.forEach((attr) => {
         if (!attributeEqual(left, right, attr))
         {
-            modifications.push({ attributeName: attr.name, newValue: right.data[attr.name] } as ComponentModification)
+            let newValue = GetAttrByName(attr.name, left);
+            if (newValue)
+            {
+                modifications.push({ attributeName: attr.name, newValue: newValue.val } as ComponentModification)
+            }
         }
     });  
     return modifications;
@@ -358,29 +384,34 @@ function MergeSchemaMap(left: any, right: any, delta: DefinitionsDelta)
     return merge;
 }
 
-function GetRefs(attr: ComponentAttributeInstance, references: Reference[])
+function VisitAttribute(attr: ComponentAttributeInstance, fn: (ComponentAttributeInstance)=>void)
 {
-    if (attr.type === ComponentAttributeType.REF)
+    if (attr.type === ComponentAttributeType.ARRAY)
     {
-        references.push(attr.val);
-    }
-    else if (attr.type === ComponentAttributeType.ARRAY)
-    {
-        attr.val.forEach((ncai) => GetRefs(ncai, references));
+        fn(attr);
+        attr.val.forEach((ncai) => VisitAttribute(ncai, fn));
     }
     else
     {
-        // other types arent refs ever
-        return;
+        fn(attr);
     }
 }
 
+function VisitAttributes(comp: Component, fn: (ComponentAttributeInstance)=>void)
+{
+    comp.data.forEach((ncai) => {
+        VisitAttribute(ncai.val, fn);
+    })
+}
 
 function GetRefsFromComponent(comp: Component)
 {
     let refs: Reference[] = [];
-    comp.data.forEach((ncai) => {
-        GetRefs(ncai.val, refs);
+    VisitAttributes(comp, (attr: ComponentAttributeInstance) => {
+        if (attr.type === ComponentAttributeType.REF)
+        {
+            refs.push(attr.val);
+        }
     })
     return refs;
 }
@@ -565,16 +596,84 @@ function BuildInitialLockedReferences(hashDiff: HashDifference, guidsDiff: Guids
     return lockedReferences;
 }
 
-function MakeTreeReferencesCompatible(hashDiff: HashDifference, guidsDiff: GuidsDifference, refMapLeft: any, refMapRight: any)
+function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDifference, refMapLeft: any, refMapRight: any)
 {
     // based on hash & guid equality we can try to map existing references together between the two ecs trees. 
     // We call a mapping from right to left reference a "locked" reference, in the sense that the final reference has been decided
     let lockedReferences = BuildInitialLockedReferences(hashDiff, guidsDiff);
 
-    console.log(`-- locked`, lockedReferences);
-
     // we will now try to rewrite the references in the RIGHT ecs to match the references in the LEFT ecs
-    // because we need to rewrite child-references before proceeding upwards in the tree, we consult the depth map
+    // for this, we have to start with a list of known reference matches, derive new information to produce new reference matches, and so on
+    // the locked references will already tell us all the elements which are equal by-hash or by guid. This narrows down the search space for small edits.
+
+    let newlyLockedReferences = [];
+    guidsDiff.matchingGuids.forEach((guid) => {
+        newlyLockedReferences.push(guidsDiff.guidToRefRight[guid]);
+    });
+
+    while(true)
+    {
+        let nextIteration = [];
+
+        newlyLockedReferences.forEach((refR) => {
+            let refL = lockedReferences[refR];
+
+            let compL = refMapLeft[refL];
+            let compR = refMapRight[refR];
+
+            let refsL = GetRefsFromComponent(compL);
+            let refsR = GetRefsFromComponent(compR);
+
+            if (refsL.length !== refsR.length)
+            {
+                // some set of refs got changed, there is a genuine modification between these two elements
+                // we could try to assign these in some way, but its better to rely on hashing here
+            }
+            else
+            {
+                // same set of refs, lets try to match them together naively
+                for (let i = 0; i < refsL.length; i++)
+                {
+                    let refL = refsL[i];
+                    let refR = refsR[i];
+                    
+                    if (lockedReferences[refR])
+                    {
+                        let lockedRef = lockedReferences[refR];
+                        if (lockedRef === refL)
+                        {
+                            // ref is locked to the same ref as L, all is good
+                        }
+                        else
+                        {
+                            // ref is locked, but NOT to same ref as L, this is a modification of the component
+                            // basically it means that this component references a different component now
+                        }
+                    }
+                    else
+                    {
+                        // no locked reference yet for R, we greedily capture L as the locked reference and assume that's the right thing to do
+                        // if it turns out we're wrong, we're gonna be modifying a bunch of components unnecessarily
+                        lockedReferences[refR] = refL;
+                        nextIteration.push(refR);
+                    }
+                }
+            }
+        });
+
+        if (nextIteration.length === 0)
+        {
+            break;
+        }
+
+        newlyLockedReferences = nextIteration;
+    }
+
+    // for added guids, the story is simpler, we look if the tree has hashes we already know, those can be locked, others are forced to become new entities
+    // in other words, there is nothing to do
+    // for removed guids, there is also nothing to do
+
+    return lockedReferences;
 }
 
 export function DiffECS(left: ECS, right: ECS): Transaction
@@ -610,8 +709,44 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         console.log(`guids removed: ${guidsDiff.removedGuids}`);
     }
 
-    MakeTreeReferencesCompatible(hashDiff, guidsDiff, refMapLeft, refMapRight);
+    let lockedReferences = BuildLockedReferences(hashDiff, guidsDiff, refMapLeft, refMapRight);
+    console.log(`locked`, lockedReferences);
 
+    let invertedLockedReferences = {};
+    Object.keys(lockedReferences).forEach((refRight) => invertedLockedReferences[lockedReferences[refRight]] = refRight);
+    console.log(`!locked`, invertedLockedReferences);
+
+    let allRemovedComponents = [];
+    let allModifiedComponents = [];
+    let allAddedComponents = [];
+
+    Object.keys(refMapLeft).forEach((refLeft) => {
+        let refRight = invertedLockedReferences[refLeft];
+
+        if (!refRight)
+        {
+            // this ref has been removed
+            allRemovedComponents.push(parseInt(refLeft)); // ???
+        }
+    });
+
+    Object.keys(refMapRight).forEach((refRight) => {
+        let refLeft = lockedReferences[refRight];
+
+        if (refLeft)
+        {
+            // this ref is a match!
+            let modification = MakeModifiedComponent(refMapLeft[refLeft], refMapRight[refRight], schemaMap);
+            if (modification) allModifiedComponents.push(modification);
+        }
+        else
+        {
+            // this ref is new!
+            allAddedComponents.push(MakeCreatedComponent(refMapRight[refRight], nextRef++));
+        }
+    });
+    
+/*
     let allModifiedComponents = guidsDiff.matchingGuids.map((guid) => MakeModifiedComponent(refMapLeft[guidsDiff.guidToRefLeft[guid]], refMapRight[guidsDiff.guidToRefRight[guid]], schemaMap)) as ModifiedComponent[];
     // filter out nulls
     allModifiedComponents = allModifiedComponents.filter(m => m) as ModifiedComponent[];
@@ -621,6 +756,7 @@ export function DiffECS(left: ECS, right: ECS): Transaction
 
     let allRemovedComponents = guidsDiff.removedGuids.map((guid) => guidsDiff.guidToRefLeft[guid]);
     allRemovedComponents = [...allRemovedComponents, ...hashDiff.removedHashes.map((hash) => hashDiff.hashToRefLeft[hash])];
+    */
 
     let componentsDelta: ComponentsDelta = {
         added: allAddedComponents,
