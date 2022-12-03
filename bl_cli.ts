@@ -565,6 +565,18 @@ function BuildInitialLockedReferences(hashDiff: HashDifference, guidsDiff: Guids
     return lockedReferences;
 }
 
+function MakeTreeReferencesCompatible(hashDiff: HashDifference, guidsDiff: GuidsDifference, refMapLeft: any, refMapRight: any)
+{
+    // based on hash & guid equality we can try to map existing references together between the two ecs trees. 
+    // We call a mapping from right to left reference a "locked" reference, in the sense that the final reference has been decided
+    let lockedReferences = BuildInitialLockedReferences(hashDiff, guidsDiff);
+
+    console.log(`-- locked`, lockedReferences);
+
+    // we will now try to rewrite the references in the RIGHT ecs to match the references in the LEFT ecs
+    // because we need to rewrite child-references before proceeding upwards in the tree, we consult the depth map
+}
+
 export function DiffECS(left: ECS, right: ECS): Transaction
 {
     let nextRef = GetMaxRef(left) + 1;
@@ -598,11 +610,7 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         console.log(`guids removed: ${guidsDiff.removedGuids}`);
     }
 
-    // based on hash & guid equality we can try to map existing references together between the two ecs trees. 
-    // We call a mapping from right to left reference a "locked" reference, in the sense that they cannot be changed
-    let lockedReferences = BuildInitialLockedReferences(hashDiff, guidsDiff);
-
-    console.log(`-- locked`, lockedReferences);
+    MakeTreeReferencesCompatible(hashDiff, guidsDiff, refMapLeft, refMapRight);
 
     let allModifiedComponents = guidsDiff.matchingGuids.map((guid) => MakeModifiedComponent(refMapLeft[guidsDiff.guidToRefLeft[guid]], refMapRight[guidsDiff.guidToRefRight[guid]], schemaMap)) as ModifiedComponent[];
     // filter out nulls
