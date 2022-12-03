@@ -385,21 +385,142 @@ function GetRefsFromComponent(comp: Component)
     return refs;
 }
 
+function UpdateDepth(ref: Reference, bwdRefs: any, depthMap: any, depth: number)
+{
+    // update current component depth
+    if (!depthMap[ref] || depthMap[ref] < depth)
+    {
+        // component receives a new depth
+        depthMap[ref] = depth;
+
+        // traverse up the tree increasing the depth
+        let bwd = bwdRefs[ref];
+        if (bwd)
+        {
+            bwd.forEach((ref) => {
+                UpdateDepth(ref, bwdRefs, depthMap, depth + 1);
+            });
+        }
+    }
+    else
+    {
+        // component was already at greater depth, no need to update it or its referees
+    }
+}
+
 function BuildReferenceTree(ecs: ECS)
 {
     let depthMap = {};
-    let forRefs = {};
-    let backRefs = {};
+    let fwdRefs = {};
+    let bwdRefs = {};
 
+    // build back/for refs
+    // TODO: check for loops here
     ecs.components.forEach((comp) => {
         let refs = GetRefsFromComponent(comp);
-        forRefs[comp.ref] = refs;
+        fwdRefs[comp.ref] = refs;
 
         refs.forEach((ref) => {
-            if (!backRefs[ref]) backRefs[ref] = [];
-            backRefs[ref].push(comp.ref);
+            if (!bwdRefs[ref]) bwdRefs[ref] = [];
+            bwdRefs[ref].push(comp.ref);
         });
     });
+
+    // find all components of depth 0
+    ecs.components.forEach((comp) => {
+        let fwd = fwdRefs[comp.ref];
+        if (!fwd || fwd.length === 0)
+        {
+            // we know this component is at depth 0, we can derive the depth upwards from here
+            UpdateDepth(comp.ref, bwdRefs, depthMap, 0);
+        }
+    });
+
+
+    if (verbose)
+    {
+        console.log(`---dm`, depthMap);
+    }
+}
+
+class HashDifference {
+    matchingHashes: string[] = [];
+    addedHashes: string[] = [];
+    removedHashes: string[] = [];
+}
+
+class GuidsDifference {
+    matchingGuids: string[] = [];
+    addedGuids: string[] = [];
+    removedGuids: string[] = [];
+}
+
+function BuildHashDiff(hashMapLeft: any, hashMapRight: any)
+{
+    let diff = new HashDifference();
+
+    // check left for status quo
+    Object.keys(hashMapLeft).forEach((hash) => {
+        if (hashMapRight[hash])
+        {
+            // match!
+            diff.matchingHashes.push(hash);
+        }
+        else
+        {
+            // no match, removed!
+            diff.removedHashes.push(hash);
+        }
+    });
+
+    // check right for added
+    Object.keys(hashMapRight).forEach((hash) => {
+        if (hashMapLeft[hash])
+        {
+            // match, but already processed!
+        }
+        else
+        {
+            // no match, added!
+            diff.addedHashes.push(hash);
+        }
+    });
+
+    return diff;
+}
+
+function BuildGuidsDiff(guidsLeft: any, guidsRight: any)
+{
+    let diff = new GuidsDifference();
+
+    // check left for status quo
+    Object.keys(guidsLeft).forEach((guid) => {
+        if (guidsRight[guid])
+        {
+            // match!
+            diff.matchingGuids.push(guid);
+        }
+        else
+        {
+            // no match, removed!
+            diff.removedGuids.push(guid);
+        }
+    });
+
+    // check right for added
+    Object.keys(guidsRight).forEach((guid) => {
+        if (guidsLeft[guid])
+        {
+            // match, but already processed!
+        }
+        else
+        {
+            // no match, added!
+            diff.addedGuids.push(guid);
+        }
+    });
+
+    return diff;
 }
 
 export function DiffECS(left: ECS, right: ECS): Transaction
@@ -425,88 +546,29 @@ export function DiffECS(left: ECS, right: ECS): Transaction
     };
     let schemaMap = MergeSchemaMap(schemaMapLeft, schemaMapRight, definitionsDelta);
 
-    let matchingGuids: string[] = [];
-    let addedGuids: string[] = [];
-    let removedGuids: string[] = [];
-    
-    let matchingHashes: string[] = [];
-    let addedHashes: string[] = [];
-    let removedHashes: string[] = [];
-
-    // check left for status quo
-    Object.keys(hashMapLeft).forEach((hash) => {
-        if (hashMapRight[hash])
-        {
-            // match!
-            matchingHashes.push(hash);
-        }
-        else
-        {
-            // no match, removed!
-            removedHashes.push(hash);
-        }
-    });
-
-    // check right for added
-    Object.keys(hashMapRight).forEach((hash) => {
-        if (hashMapLeft[hash])
-        {
-            // match, but already processed!
-        }
-        else
-        {
-            // no match, added!
-            addedHashes.push(hash);
-        }
-    });
-
-    // check left for status quo
-    Object.keys(guidsLeft).forEach((guid) => {
-        if (guidsRight[guid])
-        {
-            // match!
-            matchingGuids.push(guid);
-        }
-        else
-        {
-            // no match, removed!
-            removedGuids.push(guid);
-        }
-    });
-
-    // check right for added
-    Object.keys(guidsRight).forEach((guid) => {
-        if (guidsLeft[guid])
-        {
-            // match, but already processed!
-        }
-        else
-        {
-            // no match, added!
-            addedGuids.push(guid);
-        }
-    });
+    let hashDiff = BuildHashDiff(hashMapLeft, hashMapRight);
+    let guidsDiff = BuildGuidsDiff(guidsLeft, guidsRight);
     
     if (verbose)
     {
-        console.log(`hash matches: ${matchingHashes}`);
-        console.log(`hash added: ${addedHashes}`);
-        console.log(`hash removed: ${removedHashes}`);
+        console.log(`hash matches: ${hashDiff.matchingHashes}`);
+        console.log(`hash added: ${hashDiff.addedHashes}`);
+        console.log(`hash removed: ${hashDiff.removedHashes}`);
 
-        console.log(`guids matches: ${matchingGuids}`);
-        console.log(`guids added: ${addedGuids}`);
-        console.log(`guids removed: ${removedGuids}`);
+        console.log(`guids matches: ${guidsDiff.matchingGuids}`);
+        console.log(`guids added: ${guidsDiff.addedGuids}`);
+        console.log(`guids removed: ${guidsDiff.removedGuids}`);
     }
 
-    let allModifiedComponents = matchingGuids.map((guid) => MakeModifiedComponent(refMapLeft[guidsLeft[guid]], refMapRight[guidsRight[guid]], schemaMap)) as ModifiedComponent[];
+    let allModifiedComponents = guidsDiff.matchingGuids.map((guid) => MakeModifiedComponent(refMapLeft[guidsLeft[guid]], refMapRight[guidsRight[guid]], schemaMap)) as ModifiedComponent[];
     // filter out nulls
     allModifiedComponents = allModifiedComponents.filter(m => m) as ModifiedComponent[];
     
-    let allAddedComponents = addedGuids.map((guid) => MakeCreatedComponent(refMapRight[guidsRight[guid]], nextRef++));
-    allAddedComponents = [...allAddedComponents, ...addedHashes.map((hash) => MakeCreatedComponent(refMapRight[hashMapRight[hash]], nextRef++))];
+    let allAddedComponents = guidsDiff.addedGuids.map((guid) => MakeCreatedComponent(refMapRight[guidsRight[guid]], nextRef++));
+    allAddedComponents = [...allAddedComponents, ...hashDiff.addedHashes.map((hash) => MakeCreatedComponent(refMapRight[hashMapRight[hash]], nextRef++))];
 
-    let allRemovedComponents = removedGuids.map((guid) => guidsLeft[guid]);
-    allRemovedComponents = [...allRemovedComponents, ...removedHashes.map((hash) => hashMapLeft[hash])];
+    let allRemovedComponents = guidsDiff.removedGuids.map((guid) => guidsLeft[guid]);
+    allRemovedComponents = [...allRemovedComponents, ...hashDiff.removedHashes.map((hash) => hashMapLeft[hash])];
 
     let componentsDelta: ComponentsDelta = {
         added: allAddedComponents,
