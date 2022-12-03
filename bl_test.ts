@@ -68,15 +68,17 @@ describe('Unit Tests', function () {
                 [propDef, propSetDef],
                 [
                     GetExampleObject(1, null, propDef, [ MakeAttr("name", MakeString("myprop1")) ]),
-                    GetExampleObject(2, "1", propSetDef, [ MakeAttr("properties", MakeArray([MakeRef(1)]))] )
+                    GetExampleObject(2, null, propDef, [ MakeAttr("name", MakeString("myprop2")) ]),
+                    GetExampleObject(3, "1", propSetDef, [ MakeAttr("properties", MakeArray([MakeRef(1), MakeRef(2)]))] )
                 ]
             );
 
             let ECS2 = new ECS(
                 [propDef, propSetDef],
                 [
-                    GetExampleObject(4, null, propDef, [ MakeAttr("name", MakeString("myprop2")) ]),
-                    GetExampleObject(2, "1", propSetDef, [ MakeAttr("properties", MakeArray([MakeRef(4)]))] )
+                    GetExampleObject(4, null, propDef, [ MakeAttr("name", MakeString("myprop1")) ]),
+                    GetExampleObject(5, null, propDef, [ MakeAttr("name", MakeString("myprop4")) ]),
+                    GetExampleObject(2, "1", propSetDef, [ MakeAttr("properties", MakeArray([MakeRef(4), MakeRef(5)]))] )
                 ]
             );
             

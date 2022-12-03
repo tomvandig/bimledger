@@ -408,60 +408,77 @@ function UpdateDepth(ref: Reference, bwdRefs: any, depthMap: any, depth: number)
     }
 }
 
+class ReferenceTree {
+    depthMap: any;
+    fwdRefs: any;
+    bwdRefs: any;
+}   
+
 function BuildReferenceTree(ecs: ECS)
 {
-    let depthMap = {};
-    let fwdRefs = {};
-    let bwdRefs = {};
+    let tree = new ReferenceTree();
+
+    tree.depthMap = {};
+    tree.fwdRefs = {};
+    tree.bwdRefs = {};
 
     // build back/for refs
     // TODO: check for loops here
     ecs.components.forEach((comp) => {
         let refs = GetRefsFromComponent(comp);
-        fwdRefs[comp.ref] = refs;
+        tree.fwdRefs[comp.ref] = refs;
 
         refs.forEach((ref) => {
-            if (!bwdRefs[ref]) bwdRefs[ref] = [];
-            bwdRefs[ref].push(comp.ref);
+            if (!tree.bwdRefs[ref]) tree.bwdRefs[ref] = [];
+            tree.bwdRefs[ref].push(comp.ref);
         });
     });
 
     // find all components of depth 0
     ecs.components.forEach((comp) => {
-        let fwd = fwdRefs[comp.ref];
+        let fwd = tree.fwdRefs[comp.ref];
         if (!fwd || fwd.length === 0)
         {
             // we know this component is at depth 0, we can derive the depth upwards from here
-            UpdateDepth(comp.ref, bwdRefs, depthMap, 0);
+            UpdateDepth(comp.ref, tree.bwdRefs, tree.depthMap, 0);
         }
     });
 
 
     if (verbose)
     {
-        console.log(`---dm`, depthMap);
+        console.log(`---dm`, tree.depthMap);
     }
+
+    return tree;
 }
 
 class HashDifference {
+    hashToRefLeft: any = {};
+    hashToRefRight: any = {};
     matchingHashes: string[] = [];
     addedHashes: string[] = [];
     removedHashes: string[] = [];
 }
 
 class GuidsDifference {
+    guidToRefLeft: any = {};
+    guidToRefRight: any = {};
     matchingGuids: string[] = [];
     addedGuids: string[] = [];
     removedGuids: string[] = [];
 }
 
-function BuildHashDiff(hashMapLeft: any, hashMapRight: any)
+function BuildHashDiff(left: ECS, right: ECS)
 {
     let diff = new HashDifference();
+    
+    diff.hashToRefLeft = BuildHashMap(left);
+    diff.hashToRefRight = BuildHashMap(right);
 
     // check left for status quo
-    Object.keys(hashMapLeft).forEach((hash) => {
-        if (hashMapRight[hash])
+    Object.keys(diff.hashToRefLeft).forEach((hash) => {
+        if (diff.hashToRefRight[hash])
         {
             // match!
             diff.matchingHashes.push(hash);
@@ -474,8 +491,8 @@ function BuildHashDiff(hashMapLeft: any, hashMapRight: any)
     });
 
     // check right for added
-    Object.keys(hashMapRight).forEach((hash) => {
-        if (hashMapLeft[hash])
+    Object.keys(diff.hashToRefRight).forEach((hash) => {
+        if (diff.hashToRefLeft[hash])
         {
             // match, but already processed!
         }
@@ -489,13 +506,17 @@ function BuildHashDiff(hashMapLeft: any, hashMapRight: any)
     return diff;
 }
 
-function BuildGuidsDiff(guidsLeft: any, guidsRight: any)
+function BuildGuidsDiff(left: ECS, right: ECS)
 {
     let diff = new GuidsDifference();
 
+    diff.guidToRefLeft = BuildGuidMap(left);
+    diff.guidToRefRight = BuildGuidMap(right);
+    
+
     // check left for status quo
-    Object.keys(guidsLeft).forEach((guid) => {
-        if (guidsRight[guid])
+    Object.keys(diff.guidToRefLeft).forEach((guid) => {
+        if (diff.guidToRefRight[guid])
         {
             // match!
             diff.matchingGuids.push(guid);
@@ -508,8 +529,8 @@ function BuildGuidsDiff(guidsLeft: any, guidsRight: any)
     });
 
     // check right for added
-    Object.keys(guidsRight).forEach((guid) => {
-        if (guidsLeft[guid])
+    Object.keys(diff.guidToRefRight).forEach((guid) => {
+        if (diff.guidToRefLeft[guid])
         {
             // match, but already processed!
         }
@@ -523,19 +544,36 @@ function BuildGuidsDiff(guidsLeft: any, guidsRight: any)
     return diff;
 }
 
+function BuildInitialLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDifference)
+{
+    let lockedReferences = {};
+
+    hashDiff.matchingHashes.forEach((matchingHash) => {
+        let refLeft = hashDiff.hashToRefLeft[matchingHash];
+        let refRight = hashDiff.hashToRefRight[matchingHash];
+
+        lockedReferences[refRight] = refLeft;
+    });
+    
+    guidsDiff.matchingGuids.forEach((matchingGuid) => {
+        let refLeft = guidsDiff.guidToRefLeft[matchingGuid];
+        let refRight = guidsDiff.guidToRefRight[matchingGuid];
+
+        lockedReferences[refRight] = refLeft;
+    });
+
+    return lockedReferences;
+}
+
 export function DiffECS(left: ECS, right: ECS): Transaction
 {
     let nextRef = GetMaxRef(left) + 1;
 
     let refMapLeft = BuildRefMap(left);
     let refMapRight = BuildRefMap(right);
-    let guidsLeft = BuildGuidMap(left);
-    let guidsRight = BuildGuidMap(right);
-    let hashMapLeft = BuildHashMap(left);
-    let hashMapRight = BuildHashMap(right);
 
-    BuildReferenceTree(left);
-    BuildReferenceTree(right);
+    let referenceTreeLeft = BuildReferenceTree(left);
+    let referenceTreeRight = BuildReferenceTree(right);
 
     let schemaMapLeft = BuildSchemaMap(left);
     let schemaMapRight = BuildSchemaMap(right);
@@ -546,8 +584,8 @@ export function DiffECS(left: ECS, right: ECS): Transaction
     };
     let schemaMap = MergeSchemaMap(schemaMapLeft, schemaMapRight, definitionsDelta);
 
-    let hashDiff = BuildHashDiff(hashMapLeft, hashMapRight);
-    let guidsDiff = BuildGuidsDiff(guidsLeft, guidsRight);
+    let hashDiff = BuildHashDiff(left, right);
+    let guidsDiff = BuildGuidsDiff(left, right);
     
     if (verbose)
     {
@@ -560,15 +598,21 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         console.log(`guids removed: ${guidsDiff.removedGuids}`);
     }
 
-    let allModifiedComponents = guidsDiff.matchingGuids.map((guid) => MakeModifiedComponent(refMapLeft[guidsLeft[guid]], refMapRight[guidsRight[guid]], schemaMap)) as ModifiedComponent[];
+    // based on hash & guid equality we can try to map existing references together between the two ecs trees. 
+    // We call a mapping from right to left reference a "locked" reference, in the sense that they cannot be changed
+    let lockedReferences = BuildInitialLockedReferences(hashDiff, guidsDiff);
+
+    console.log(`-- locked`, lockedReferences);
+
+    let allModifiedComponents = guidsDiff.matchingGuids.map((guid) => MakeModifiedComponent(refMapLeft[guidsDiff.guidToRefLeft[guid]], refMapRight[guidsDiff.guidToRefRight[guid]], schemaMap)) as ModifiedComponent[];
     // filter out nulls
     allModifiedComponents = allModifiedComponents.filter(m => m) as ModifiedComponent[];
     
-    let allAddedComponents = guidsDiff.addedGuids.map((guid) => MakeCreatedComponent(refMapRight[guidsRight[guid]], nextRef++));
-    allAddedComponents = [...allAddedComponents, ...hashDiff.addedHashes.map((hash) => MakeCreatedComponent(refMapRight[hashMapRight[hash]], nextRef++))];
+    let allAddedComponents = guidsDiff.addedGuids.map((guid) => MakeCreatedComponent(refMapRight[guidsDiff.guidToRefRight[guid]], nextRef++));
+    allAddedComponents = [...allAddedComponents, ...hashDiff.addedHashes.map((hash) => MakeCreatedComponent(refMapRight[hashDiff.hashToRefRight[hash]], nextRef++))];
 
-    let allRemovedComponents = guidsDiff.removedGuids.map((guid) => guidsLeft[guid]);
-    allRemovedComponents = [...allRemovedComponents, ...hashDiff.removedHashes.map((hash) => hashMapLeft[hash])];
+    let allRemovedComponents = guidsDiff.removedGuids.map((guid) => guidsDiff.guidToRefLeft[guid]);
+    allRemovedComponents = [...allRemovedComponents, ...hashDiff.removedHashes.map((hash) => hashDiff.hashToRefLeft[hash])];
 
     let componentsDelta: ComponentsDelta = {
         added: allAddedComponents,
