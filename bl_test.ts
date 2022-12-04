@@ -3,6 +3,8 @@ import { expect } from 'chai';
 import { BuildECS, DiffECS, ECS, Ledger, RehashECS, SetVerbose } from './bl_cli';
 import { describe, it } from "./crappucino";
 import { GetExampleObject, GetExamplePropDefinition, GetExamplePropSetDefinition, MakeArray, MakeAttr, MakeRef, MakeString } from './example';
+import ConvertIFCToECS from './ifc2ecs';
+import { ifcdata } from './ifcdata';
 
 describe('Integration Tests', function () {
     describe('Diff two ecs files', function () {
@@ -86,6 +88,15 @@ describe('Unit Tests', function () {
 
             console.log(JSON.stringify(initialTransaction, null, 4));
             
+        });
+    });
+});
+
+
+describe('Unit Tests', function () {
+    describe('IFC parsing', function () {
+        it('IFC should parse', function () {
+            ConvertIFCToECS(ifcdata);
         });
     });
 });
