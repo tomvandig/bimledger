@@ -7,6 +7,7 @@ interface Type {
     isSelect: boolean;
     values: string[];
     isType: boolean;
+    isEntity: boolean;
 }
 
 interface Prop {
@@ -34,6 +35,7 @@ interface Entity {
     derivedInverseProps: InverseProp[] | null,
     isIfcProduct: boolean;
     isEntity: boolean;
+    isType: boolean;
 }
 
 interface Param
@@ -133,7 +135,8 @@ export function sortEntities(entities: Entity[]) {
                   inverseProps: [],
                   derivedInverseProps: [],
                   isIfcProduct: false,
-                  isEntity: true
+                  isEntity: true,
+                  isType: false
               };
               if (name === "IfcProduct") entity.isIfcProduct = true;
               readProps = true;
@@ -212,7 +215,7 @@ export function sortEntities(entities: Entity[]) {
                   typeName = typeName.substr(0, firstBracket);
               }
   
-              typeName = expTypeToTSType(typeName);
+              // typeName = expTypeToTSType(typeName);
               
               type = {
                   name,
@@ -221,7 +224,8 @@ export function sortEntities(entities: Entity[]) {
                   isEnum,
                   isSelect,
                   values,
-                  isType: true
+                  isType: true,
+                  isEntity: false
               }
           }
           else if (line.indexOf("END_TYPE") == 0)
@@ -249,7 +253,7 @@ export function sortEntities(entities: Entity[]) {
               {
                   type = type.substr(0, firstBracket);
               }
-              let tsType = expTypeToTSType(type);
+              let tsType = type;//expTypeToTSType(type);
               entity.props.push({
                   name,
                   type: tsType,
@@ -383,7 +387,8 @@ export function ParseEXP()
 
     function PropTypeToAttrType(typeName: string)
     {
-        if (typeName === "number")
+        // TODO: new types
+        if (typeName === "NUMBER" || typeName === "REAL" || typeName === "INTEGER")
         {
             return ComponentAttributeType.NUMBER;
         }
@@ -404,7 +409,55 @@ export function ParseEXP()
             return ComponentAttributeType.LOGICAL;
         }
 
-        return ComponentAttributeType.ARRAY;
+        throw new Error(`Unkonwn prop type: "${typeName}"`);
+    }
+
+    function ToChildAttrVal(propType: Entity | Type)
+    {
+        let type = ComponentAttributeType.ARRAY;
+
+        if (propType.isType)
+        {
+            let _type = (propType as Type);
+            if (_type.isEnum)
+            {
+                // TODO: work with values
+                type = ComponentAttributeType.STRING;
+            }
+            else if (_type.isSelect)
+            {
+                // one of
+                return {
+                    type: ComponentAttributeType.SELECT,
+                    optional: false,
+                    child: _type.values.map(val => ToChildAttrVal(nameToObj[val]))
+                } as ComponentAttributeValue
+            }
+            else
+            {
+                let propType = nameToObj[_type.typeName];
+
+                if (propType)
+                {
+                    return ToChildAttrVal(propType);
+                }
+                else
+                {
+                    type = PropTypeToAttrType(_type.typeName)
+                }
+            }
+        }
+        else if (propType.isEntity)
+        {
+            // TODO: specify ref type
+            type = ComponentAttributeType.REF;
+        }
+
+        return {
+            type: type,
+            optional: false,
+            child: null
+        } as ComponentAttributeValue
     }
 
     function ToAttrVal(prop: Prop)
@@ -423,45 +476,17 @@ export function ParseEXP()
         }
         else if (prop.set)
         {
-            let type = ComponentAttributeType.ARRAY;
-
-            if (propType.isType)
-            {
-                type = PropTypeToAttrType(propType.typeName)
-            }
-            else if (propType.isEntity)
-            {
-                type = ComponentAttributeType.REF;
-            }
-
             return {
                 type: ComponentAttributeType.ARRAY,
                 optional: prop.optional,
-                child: {
-                    type,
-                    optional: false,
-                    child: null
-                }
+                child: ToChildAttrVal(propType)
             } as ComponentAttributeValue
         }
         else
         {
-            let type = ComponentAttributeType.ARRAY;
-
-            if (propType.isType)
-            {
-                type = PropTypeToAttrType(propType.typeName)
-            }
-            else if (propType.isEntity)
-            {
-                type = ComponentAttributeType.REF;
-            }
-
-            return {
-                type: type,
-                optional: prop.optional,
-                child: null
-            } as ComponentAttributeValue
+            let attr = ToChildAttrVal(propType);
+            attr.optional = prop.optional;
+            return attr;
         }
     }
 

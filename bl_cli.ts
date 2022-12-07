@@ -58,6 +58,7 @@ export enum ComponentAttributeType
 {
     NUMBER,
     STRING,
+    SELECT,
     ARRAY,
     LABEL,
     BOOLEAN,
@@ -70,7 +71,7 @@ export interface ComponentAttributeValue
 {
     type: ComponentAttributeType;
     optional: boolean;
-    child: ComponentAttributeValue | null;
+    child: ComponentAttributeValue | null | ComponentAttributeValue[];
 }
 
 export interface ComponentAttribute
