@@ -424,6 +424,18 @@ export function ParseEXP()
                 // TODO: work with values
                 type = ComponentAttributeType.STRING;
             }
+            else if (_type.isList)
+            {
+                return {
+                    type: ComponentAttributeType.ARRAY,
+                    optional: false,
+                    child: {
+                        type: PropTypeToAttrType(_type.typeName),
+                        optional: false,
+                        child: null
+                    } as ComponentAttributeValue
+                } as ComponentAttributeValue
+            }
             else if (_type.isSelect)
             {
                 // one of
@@ -468,11 +480,26 @@ export function ParseEXP()
         {
             let type = PropTypeToAttrType(prop.type)
 
-            return {
-                type: type,
-                optional: prop.optional,
-                child: null
-            } as ComponentAttributeValue
+            if (prop.set)
+            {
+                return {
+                    type: ComponentAttributeType.ARRAY,
+                    optional: prop.optional,
+                    child: {
+                        type: type,
+                        optional: false,
+                        child: null
+                    }
+                } as ComponentAttributeValue
+            }
+            else
+            {
+                return {
+                    type: type,
+                    optional: prop.optional,
+                    child: null
+                } as ComponentAttributeValue
+            }
         }
         else if (prop.set)
         {

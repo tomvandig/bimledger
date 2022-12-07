@@ -160,7 +160,7 @@ class LineParser
 
     ParseLineDataToSchema()
     {
-        console.log(this.schema);
+        console.log(JSON.stringify(this.schema, null, 4));
 
         while (!this.AtEnd())
         {
@@ -216,7 +216,7 @@ export default function ConvertIFCToECS(stringData: string, definitions: Compone
         schemaMap[ComponentTypeToString(def.id)] = def;
     });
 
-    let result = ParseLineToSchema(parser._lines[2], schemaMap);
+    let result = ParseLineToSchema(parser._lines[4], schemaMap);
     console.log(JSON.stringify(result, null, 4));
 }
 
