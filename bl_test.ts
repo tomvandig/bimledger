@@ -105,7 +105,8 @@ describe('Unit Tests', function () {
 describe('Unit Tests', function () {
     describe('EXP parsing', function () {
         it('EXP should parse', function () {
-            ParseEXP();
+            let defs = ParseEXP();
+            
         });
     });
 });

@@ -60,27 +60,31 @@ export enum ComponentAttributeType
     STRING,
     ARRAY,
     LABEL,
+    BOOLEAN,
+    BINARY,
+    LOGICAL,
     REF
 }
 
-interface ComponentAttributeValue
+export interface ComponentAttributeValue
 {
     type: ComponentAttributeType;
+    optional: boolean;
     child: ComponentAttributeValue | null;
 }
 
-interface ComponentAttribute
+export interface ComponentAttribute
 {
     name: string;
     value: ComponentAttributeValue;
 }
 
-interface ComponentSchema
+export interface ComponentSchema
 {
     attributes: ComponentAttribute[];
 }
 
-interface ComponentDefinition
+export interface ComponentDefinition
 {
     id: ComponentType;
     parent: null | ComponentType;

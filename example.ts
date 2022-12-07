@@ -12,6 +12,7 @@ export function GetExamplePropDefinition()
                     name: "name",
                     value: {
                         type: ComponentAttributeType.STRING,
+                        optional: false,
                         child: null
                     }
                 }
@@ -32,8 +33,10 @@ export function GetExamplePropSetDefinition()
                     name: "properties",
                     value: {
                         type: ComponentAttributeType.ARRAY,
+                        optional: false,
                         child: {
                             type: ComponentAttributeType.REF,
+                            optional: false,
                             child: null
                         }
                     }

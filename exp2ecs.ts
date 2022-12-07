@@ -1,4 +1,4 @@
-
+import { ComponentAttribute, ComponentAttributeType, ComponentAttributeValue, ComponentDefinition, ComponentSchema } from "./bl_cli";
 interface Type {
     name: string;
     typeName : string;
@@ -381,11 +381,124 @@ export function ParseEXP()
         console.log(JSON.stringify(e, null, 4));
     }
 
-    for (let i = 0; i < 10; i++)
+    function PropTypeToAttrType(typeName: string)
     {
-        print(entities[i]);
+        if (typeName === "number")
+        {
+            return ComponentAttributeType.NUMBER;
+        }
+        else if (typeName == "STRING")
+        {
+            return ComponentAttributeType.STRING;
+        }
+        else if (typeName == "BOOLEAN")
+        {
+            return ComponentAttributeType.BOOLEAN;
+        }
+        else if (typeName == "BINARY")
+        {
+            return ComponentAttributeType.BINARY;
+        }
+        else if (typeName == "LOGICAL")
+        {
+            return ComponentAttributeType.LOGICAL;
+        }
+
+        return ComponentAttributeType.ARRAY;
     }
 
+    function ToAttrVal(prop: Prop)
+    {
+        let propType = nameToObj[prop.type];
+
+        if (!propType)
+        {
+            let type = PropTypeToAttrType(prop.type)
+
+            return {
+                type: type,
+                optional: prop.optional,
+                child: null
+            } as ComponentAttributeValue
+        }
+        else if (prop.set)
+        {
+            let type = ComponentAttributeType.ARRAY;
+
+            if (propType.isType)
+            {
+                type = PropTypeToAttrType(propType.typeName)
+            }
+            else if (propType.isEntity)
+            {
+                type = ComponentAttributeType.REF;
+            }
+
+            return {
+                type: ComponentAttributeType.ARRAY,
+                optional: prop.optional,
+                child: {
+                    type,
+                    optional: false,
+                    child: null
+                }
+            } as ComponentAttributeValue
+        }
+        else
+        {
+            let type = ComponentAttributeType.ARRAY;
+
+            if (propType.isType)
+            {
+                type = PropTypeToAttrType(propType.typeName)
+            }
+            else if (propType.isEntity)
+            {
+                type = ComponentAttributeType.REF;
+            }
+
+            return {
+                type: type,
+                optional: prop.optional,
+                child: null
+            } as ComponentAttributeValue
+        }
+    }
+
+    function ToAttribute(prop: Prop)
+    {
+        let attr: ComponentAttribute = {
+            name: prop.name,
+            value: ToAttrVal(prop)
+        }
+
+        return attr;
+    }
+
+    function ToSchema(props: Prop[])
+    {
+        let schema: ComponentSchema = {
+            attributes: props.map((prop) => ToAttribute(prop))
+        }
+
+        return schema;
+    }
+
+    function ToComponentDefinition(e: Entity)
+    {
+        let comp: ComponentDefinition = {
+            id: ["ifc2x3", e.name],
+            parent: null,
+            ownership: "any",
+            schema: ToSchema(e.derivedProps)
+        }
+
+        return comp;
+    }
+
+    let definitions = entities.map(e => ToComponentDefinition(e));
+
+    return definitions;
     }
 
     //finish writing the TS metaData
