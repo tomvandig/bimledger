@@ -95,18 +95,18 @@ describe('Unit Tests', function () {
 
 
 describe('Unit Tests', function () {
-    describe('IFC parsing', function () {
-        it('IFC should parse', function () {
-            ConvertIFCToECS(ifcdata);
+    describe('EXP parsing', function () {
+        it('EXP should parse', function () {
+            ParseEXP();
         });
     });
 });
 
 describe('Unit Tests', function () {
-    describe('EXP parsing', function () {
-        it('EXP should parse', function () {
+    describe('IFC parsing', function () {
+        it('IFC should parse', function () {
             let defs = ParseEXP();
-            
+            ConvertIFCToECS(ifcdata, defs);
         });
     });
 });

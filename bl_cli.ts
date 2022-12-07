@@ -10,7 +10,7 @@ export function SetVerbose(v: boolean)
     verbose = v;
 }
 
-function ComponentTypeToString(type: ComponentType)
+export function ComponentTypeToString(type: ComponentType)
 {
     return type.join("::");
 }

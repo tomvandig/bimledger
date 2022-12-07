@@ -512,7 +512,7 @@ export function ParseEXP()
     function ToComponentDefinition(e: Entity)
     {
         let comp: ComponentDefinition = {
-            id: ["ifc2x3", e.name],
+            id: ["ifc2x3", e.name.toLocaleLowerCase()],
             parent: null,
             ownership: "any",
             schema: ToSchema(e.derivedProps)

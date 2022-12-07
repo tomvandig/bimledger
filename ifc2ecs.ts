@@ -1,3 +1,4 @@
+import { ComponentAttributeInstance, ComponentAttributeType, ComponentAttributeValue, ComponentDefinition, ComponentSchema, ComponentTypeToString, NamedComponentAttributeInstance } from "./bl_cli";
 
 enum IfcTokenType
 {
@@ -15,7 +16,178 @@ enum IfcTokenType
 
 const READ_BUF_SIZE = 1024 * 1024; // 1 mb
 
-export default function ConvertIFCToECS(stringData: string)
+class LineParser
+{
+    data_ptr = 0;
+    schema_ptr = 0;
+    data: any[];
+    schema: ComponentSchema;
+    attrInstances: NamedComponentAttributeInstance[] = [];
+
+    constructor(d: any[], s: ComponentSchema)
+    {
+        this.data = d;
+        this.schema = s;
+    }
+
+    AtEnd()
+    {
+        return this.data_ptr === this.data.length;
+    }
+
+    ParseAttribute(schemaValue: ComponentAttributeValue)
+    {
+        let type = this.data[this.data_ptr++] as IfcTokenType;
+
+        /*
+
+    NUMBER,
+    STRING,
+    SELECT,
+    ARRAY,
+    LABEL,
+    BOOLEAN,
+    BINARY,
+    LOGICAL,
+    REF
+        */
+
+        if (schemaValue.optional && type === IfcTokenType.EMPTY)
+        {
+            // optional & empty, all good
+            return { 
+                type: schemaValue.type,
+                val: null
+                } as ComponentAttributeInstance;
+        }
+        else
+        {
+            if (schemaValue.type === ComponentAttributeType.STRING)
+            {
+                if (type !== IfcTokenType.STRING)
+                {
+                    throw new Error(`Bad type ${type} found for string`);
+                }
+                else
+                {
+                    // type match
+                    return { 
+                        type: ComponentAttributeType.STRING,
+                        val: this.data[this.data_ptr++]
+                     } as ComponentAttributeInstance;
+                }
+            }
+            else if (schemaValue.type === ComponentAttributeType.REF)
+            {
+                if (type !== IfcTokenType.REF)
+                {
+                    throw new Error(`Bad type ${type} found for ref`);
+                }
+                else
+                {
+                    // type match
+                    return { 
+                        type: ComponentAttributeType.REF,
+                        val: this.data[this.data_ptr++]
+                     } as ComponentAttributeInstance;
+                }
+            }
+            else if (schemaValue.type === ComponentAttributeType.NUMBER)
+            {
+                if (type !== IfcTokenType.REAL)
+                {
+                    throw new Error(`Bad type ${type} found for number`);
+                }
+                else
+                {
+                    // type match
+                    return { 
+                        type: ComponentAttributeType.NUMBER,
+                        val: this.data[this.data_ptr++]
+                     } as ComponentAttributeInstance;
+                }
+            }
+            else if (schemaValue.type === ComponentAttributeType.ARRAY)
+            {
+                if (type !== IfcTokenType.SET_BEGIN)
+                {
+                    throw new Error(`Bad type ${type} found for array`);
+                }
+                else
+                {
+                    let arr: ComponentAttributeInstance[] = [];
+
+                    let arrayType = this.data[this.data_ptr];
+
+                    while (arrayType !== IfcTokenType.SET_END)
+                    {
+                        arr.push(this.ParseAttribute(schemaValue.child as ComponentAttributeValue));
+                        
+                        arrayType = this.data[this.data_ptr];
+                    }
+
+                    this.data_ptr++;
+
+                    // type match
+                    return { 
+                        type: ComponentAttributeType.ARRAY,
+                        val: arr
+                     } as ComponentAttributeInstance;
+                }
+            }
+            else
+            {
+                throw new Error(`Unsupported type ${schemaValue.type}`);
+            }
+        }
+    }
+
+    ParseNewAttribute()
+    {
+        if (this.schema.attributes.length <= this.schema_ptr)
+        {
+            throw new Error(`Exceeded schema length ${this.schema_ptr} ${this.schema.attributes.length}`);
+        }
+
+        let attr = this.schema.attributes[this.schema_ptr++];
+        let schemaValue = attr.value;
+
+        return {
+            name: attr.name,
+            val: this.ParseAttribute(schemaValue)
+        } as NamedComponentAttributeInstance;
+    }
+
+    ParseLineDataToSchema()
+    {
+        console.log(this.schema);
+
+        while (!this.AtEnd())
+        {
+            this.attrInstances.push(this.ParseNewAttribute());
+        }
+
+        return this.attrInstances;
+    }
+
+}
+
+function ParseLineToSchema(line: Line, schemaMap: any)
+{
+    let lineType = ComponentTypeToString([`ifc2x3`, line.type.toLocaleLowerCase()]);
+    let definition = schemaMap[lineType] as ComponentDefinition;
+
+    console.log(line);
+
+    if (!definition)
+    {
+        throw new Error(`Unknown line type ${lineType}`);
+    }
+
+    return new LineParser(line.data, definition.schema).ParseLineDataToSchema();
+}
+
+export default function ConvertIFCToECS(stringData: string, definitions: ComponentDefinition[])
 {
     let tokenizer = new Tokenizer();
 
@@ -23,8 +195,6 @@ export default function ConvertIFCToECS(stringData: string)
     tokenizer.Tokenize((data: Uint8Array, size: number) => {
         let start = ptr;
         let end = Math.min(ptr + size, stringData.length);
-
-        console.log(`Request ${start} ${end}`);
 
         for (let i = start; i < end; i++)
         {
@@ -41,7 +211,13 @@ export default function ConvertIFCToECS(stringData: string)
 
     parser.ParseTape();
 
-    console.log(parser._lines[0]);
+    let schemaMap: any = {};
+    definitions.forEach((def) => {
+        schemaMap[ComponentTypeToString(def.id)] = def;
+    });
+
+    let result = ParseLineToSchema(parser._lines[2], schemaMap);
+    console.log(JSON.stringify(result, null, 4));
 }
 
 class Line {
@@ -55,7 +231,7 @@ function BuildLine(lineData: any[], currentExpressID: number, currentIfcType: st
     let l = new Line();
     l.id = currentExpressID;
     l.type = currentIfcType;
-    l.data = lineData;
+    l.data = lineData.slice(1, lineData.length - 2);
     return l;
 }
 
