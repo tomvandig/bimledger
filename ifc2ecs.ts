@@ -39,18 +39,44 @@ class LineParser
     {
         let type = this.data[this.data_ptr++] as IfcTokenType;
 
-        /*
+        if (type === IfcTokenType.LABEL)
+        {
+            // label inside of the data field means this is a named type, the middle finger of the express specification
+            // we read the label string and continue in a state of deep regret and confusion
 
-    NUMBER,
-    STRING,
-    SELECT,
-    ARRAY,
-    LABEL,
-    BOOLEAN,
-    BINARY,
-    LOGICAL,
-    REF
-        */
+            let specificType = this.data[this.data_ptr++];
+
+            let openingBrace = this.data[this.data_ptr++];
+
+            if (openingBrace !== IfcTokenType.SET_BEGIN)
+            {
+                throw new Error(`No opening brace for named type!`);
+            }
+
+            let nestedObj = { 
+                type: ComponentAttributeType.LABEL,
+                namedType: specificType,
+                val: this.ParseAttribute(schemaValue)
+                } as ComponentAttributeInstance;
+
+            let closingBrace = this.data[this.data_ptr++];
+
+            if (closingBrace !== IfcTokenType.SET_END)
+            {
+                throw new Error(`No closing brace for named type!`);
+            }
+
+            return nestedObj;
+        }
+
+        if (type === IfcTokenType.UNKNOWN)
+        {
+            // we always approve this
+            return { 
+                type: schemaValue.type,
+                val: null
+                } as ComponentAttributeInstance;
+        }
 
         if (schemaValue.optional && type === IfcTokenType.EMPTY)
         {
@@ -64,7 +90,7 @@ class LineParser
         {
             if (schemaValue.type === ComponentAttributeType.STRING)
             {
-                if (type !== IfcTokenType.STRING)
+                if (type !== IfcTokenType.STRING && type !== IfcTokenType.ENUM)
                 {
                     throw new Error(`Bad type ${type} found for string`);
                 }
@@ -105,6 +131,68 @@ class LineParser
                         type: ComponentAttributeType.NUMBER,
                         val: this.data[this.data_ptr++]
                      } as ComponentAttributeInstance;
+                }
+            }
+            else if (schemaValue.type === ComponentAttributeType.BOOLEAN)
+            {
+                if (type !== IfcTokenType.ENUM)
+                {
+                    throw new Error(`Bad type ${type} found for boolean`);
+                }
+                else
+                {
+                    // type match
+                    return { 
+                        type: ComponentAttributeType.BOOLEAN,
+                        val: this.data[this.data_ptr++] === "T"
+                     } as ComponentAttributeInstance;
+                }
+            }
+            else if (schemaValue.type === ComponentAttributeType.LOGICAL)
+            {
+                if (type !== IfcTokenType.ENUM)
+                {
+                    throw new Error(`Bad type ${type} found for boolean`);
+                }
+                else
+                {
+                    // type match
+                    return { 
+                        type: ComponentAttributeType.LOGICAL,
+                        val: this.data[this.data_ptr++] === "T"
+                     } as ComponentAttributeInstance;
+                }
+            }
+            else if (schemaValue.type === ComponentAttributeType.SELECT)
+            {
+                // for this value, any of the listed child type values are valid
+                let childTypes = schemaValue.child as ComponentAttributeValue[];
+                
+                let attr: ComponentAttributeInstance | null = null;
+
+                let saved_ptr = this.data_ptr - 1;
+                for (let i = 0; i < childTypes.length; i++)
+                {
+                    this.data_ptr = saved_ptr;
+
+
+                    let type = childTypes[i];
+                    try {
+                        attr = this.ParseAttribute(type);
+                        break;
+                    }catch(e)
+                    {
+                        // nope not this one
+                    }
+                }
+
+                if (!attr)
+                {
+                    throw new Error(`None of the select types match!`);
+                }
+                else
+                {
+                    return attr;
                 }
             }
             else if (schemaValue.type === ComponentAttributeType.ARRAY)
@@ -160,7 +248,7 @@ class LineParser
 
     ParseLineDataToSchema()
     {
-        console.log(JSON.stringify(this.schema, null, 4));
+        // console.log(JSON.stringify(this.schema, null, 4));
 
         while (!this.AtEnd())
         {
@@ -177,7 +265,7 @@ function ParseLineToSchema(line: Line, schemaMap: any)
     let lineType = ComponentTypeToString([`ifc2x3`, line.type.toLocaleLowerCase()]);
     let definition = schemaMap[lineType] as ComponentDefinition;
 
-    console.log(line);
+    // console.log(line);
 
     if (!definition)
     {
@@ -216,8 +304,11 @@ export default function ConvertIFCToECS(stringData: string, definitions: Compone
         schemaMap[ComponentTypeToString(def.id)] = def;
     });
 
-    let result = ParseLineToSchema(parser._lines[4], schemaMap);
-    console.log(JSON.stringify(result, null, 4));
+    for (let i = 0; i < parser._lines.length; i++)
+    {
+        let result = ParseLineToSchema(parser._lines[i], schemaMap);
+        // console.log(JSON.stringify(result, null, 4));
+    }
 }
 
 class Line {

@@ -45,6 +45,7 @@ interface ComponentsDelta
 export interface ComponentAttributeInstance
 {
     type: ComponentAttributeType;
+    namedType: string;
     val: any;
 }
 
