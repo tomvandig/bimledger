@@ -1,4 +1,4 @@
-import { ComponentAttribute, ComponentAttributeType, ComponentAttributeValue, ComponentDefinition, ComponentSchema } from "./bl_cli";
+import { ComponentAttribute, ComponentAttributeType, ComponentAttributeValue, ComponentDefinition, ComponentSchema } from "./bl_core";
 interface Type {
     name: string;
     typeName : string;

@@ -1,4 +1,4 @@
-import { Component, ComponentAttributeInstance, ComponentAttributeType, ComponentAttributeValue, ComponentDefinition, ComponentSchema, ComponentTypeToString, ECS, NamedComponentAttributeInstance } from "./bl_cli";
+import { Component, ComponentAttributeInstance, ComponentAttributeType, ComponentAttributeValue, ComponentDefinition, ComponentSchema, ComponentTypeToString, ECS, NamedComponentAttributeInstance } from "./bl_core";
 
 enum IfcTokenType
 {

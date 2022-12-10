@@ -1,4 +1,4 @@
-import { Component, ComponentAttributeInstance, ComponentAttributeType, NamedComponentAttributeInstance } from "./bl_cli";
+import { Component, ComponentAttributeInstance, ComponentAttributeType, NamedComponentAttributeInstance } from "./bl_core";
 
 export function GetExamplePropDefinition()
 {

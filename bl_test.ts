@@ -1,6 +1,6 @@
 
 import { expect } from 'chai';
-import { BuildECS, DiffECS, ECS, Ledger, RehashECS, SetVerbose } from './bl_cli';
+import { BuildECS, DiffECS, ECS, Ledger, RehashECS, SetVerbose } from './bl_core';
 import { describe, it } from "./crappucino";
 import { GetExampleObject, GetExamplePropDefinition, GetExamplePropSetDefinition, MakeArray, MakeAttr, MakeRef, MakeString } from './example';
 import { findSubClasses, ParseEXP } from './exp2ecs';
