@@ -13,7 +13,8 @@
     }
   },
   "scripts": {
-    "build-cli": "esbuild bl_test.ts --bundle --platform=node --outfile=bundle.js && node bundle.js",
+    "build-cli": "esbuild bl_cli.ts --bundle --platform=node --outfile=bundle.js && node bundle.js",
+    "build-test": "esbuild bl_test.ts --bundle --platform=node --outfile=bundle.js && node bundle.js",
     "watch": "npm-watch"
   },
   "author": "",
