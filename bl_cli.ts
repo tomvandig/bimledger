@@ -1,3 +1,4 @@
+import { BuildECS, DiffECS, ECS, Ledger } from "./bl_core";
 import { ParseEXP } from "./exp2ecs";
 import ConvertIFCToECS from "./ifc2ecs";
 
@@ -38,8 +39,29 @@ if (command === ADD_COMMAND)
     let file = args[1];
     console.log(`Adding file: "${file}" to ecs`);
     
-    let ecs = ConvertIFCToECS(fs.readFileSync(file).toString(), ParseEXP());
-    fs.writeFileSync(ECS_NAME, JSON.stringify(ecs, null, 4));
+    console.log(`Reading current ECS`);
+    let current_ecs = fs.existsSync(ECS_NAME) ? JSON.parse(fs.readFileSync(ECS_NAME).toString()) : { definitions: [], components: [] } as ECS;
+    
+    console.log(`Converting IFC to ECS`);
+    let modified_ecs = ConvertIFCToECS(fs.readFileSync(file).toString(), ParseEXP());
+    
+    console.log(`Reading ledger`);
+    let ledger = fs.existsSync(LEDGER_NAME) ? JSON.parse(fs.readFileSync(LEDGER_NAME).toString()) : { transactions: [] } as Ledger;
+
+    console.log(`Creating ECS transaction from diff....`);
+    let transaction = DiffECS(current_ecs, modified_ecs);
+
+    console.log(`Updating ledger`);
+    ledger.transactions.push(transaction);
+
+    console.log(`Building new ECS`);
+    let new_ecs = BuildECS(ledger);
+
+    console.log(`Writing new ECS`);
+    fs.writeFileSync(ECS_NAME, JSON.stringify(new_ecs, null, 4));
+    console.log(`Writing new ledger`);
+    fs.writeFileSync(LEDGER_NAME, JSON.stringify(ledger, null, 4));
+
 
 }
 else if (command === HELP_COMMAND)

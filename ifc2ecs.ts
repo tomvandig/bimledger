@@ -321,10 +321,7 @@ export default function ConvertIFCToECS(stringData: string, definitions: Compone
         components.push(component);
     }
 
-    return {
-        definitions,
-        components
-    } as ECS;
+    return new ECS(definitions, components);
 }
 
 class Line {

@@ -190,7 +190,7 @@ function BuildGuidMap(ecs: ECS)
     return map;
 }
 
-function HashComponent(comp: Component, ecs: ECS)
+function HashComponent(comp: Component, ecs: ECS, refMap: {[index: number]:Component})
 {
     let hash = [comp.guid, ...comp.type];
     VisitAttributes(comp, (attr: ComponentAttributeInstance) => {
@@ -198,8 +198,15 @@ function HashComponent(comp: Component, ecs: ECS)
         {
             if (attr.type === ComponentAttributeType.REF)
             {
-                let comp = ecs.GetComponentByRef(attr.val);
-                hash.push(HashComponent(comp, ecs));
+                if (attr.val)
+                {
+                    let comp = refMap[attr.val];
+                    if (!comp)
+                    {
+                        throw new Error(`Unknown component reference ${attr.val}`);
+                    }
+                    hash.push(HashComponent(comp, ecs, refMap));
+                }
             }
             else
             {
@@ -211,13 +218,13 @@ function HashComponent(comp: Component, ecs: ECS)
     return spark.hash(hash.join(","));
 }
 
-function BuildHashMap(ecs: ECS)
+function BuildHashMap(ecs: ECS, refMap: {[index: number]:Component})
 {
     let map = {};
     ecs.components.forEach(comp => {
         if (!comp.guid)
         {
-            comp.hash = HashComponent(comp, ecs);
+            comp.hash = HashComponent(comp, ecs, refMap);
             map[comp.hash] = comp.ref;
         }
     });
@@ -395,7 +402,10 @@ function VisitAttribute(attr: ComponentAttributeInstance, fn: (ComponentAttribut
     if (attr.type === ComponentAttributeType.ARRAY)
     {
         fn(attr);
-        attr.val.forEach((ncai) => VisitAttribute(ncai, fn));
+        if (attr.val)
+        {
+            attr.val.forEach((ncai) => VisitAttribute(ncai, fn));
+        }
     }
     else
     {
@@ -506,12 +516,15 @@ class GuidsDifference {
     removedGuids: string[] = [];
 }
 
-function BuildHashDiff(left: ECS, right: ECS)
+function BuildHashDiff(left: ECS, right: ECS, refMapLeft: {[index: number]:Component}, refMapRight: {[index: number]:Component})
 {
     let diff = new HashDifference();
     
-    diff.hashToRefLeft = BuildHashMap(left);
-    diff.hashToRefRight = BuildHashMap(right);
+    console.log(`hash2`);
+    diff.hashToRefLeft = BuildHashMap(left, refMapLeft);
+    diff.hashToRefRight = BuildHashMap(right, refMapRight);
+
+    console.log(`hash1`);
 
     // check left for status quo
     Object.keys(diff.hashToRefLeft).forEach((hash) => {
@@ -699,10 +712,14 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         created: [],
         expired: []
     };
-    let schemaMap = MergeSchemaMap(schemaMapLeft, schemaMapRight, definitionsDelta);
 
-    let hashDiff = BuildHashDiff(left, right);
+    console.log("map", schemaMapLeft);
+    let schemaMap = MergeSchemaMap(schemaMapLeft, schemaMapRight, definitionsDelta);
+    console.log("e");
+
+    let hashDiff = BuildHashDiff(left, right, refMapLeft, refMapRight);
     let guidsDiff = BuildGuidsDiff(left, right);
+    console.log("d");
     
     if (verbose)
     {
