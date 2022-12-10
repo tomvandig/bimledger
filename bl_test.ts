@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import { BuildECS, DiffECS, ECS, Ledger, RehashECS, SetVerbose } from './bl_cli';
 import { describe, it } from "./crappucino";
 import { GetExampleObject, GetExamplePropDefinition, GetExamplePropSetDefinition, MakeArray, MakeAttr, MakeRef, MakeString } from './example';
-import { ParseEXP } from './exp2ecs';
+import { findSubClasses, ParseEXP } from './exp2ecs';
 import ConvertIFCToECS from './ifc2ecs';
 import { ifcdata } from './ifcdata';
 
@@ -105,8 +105,9 @@ describe('Unit Tests', function () {
 describe('Unit Tests', function () {
     describe('IFC parsing', function () {
         it('IFC should parse', function () {
-            let defs = ParseEXP();
-            ConvertIFCToECS(ifcdata, defs);
+            let ecs = ConvertIFCToECS(ifcdata, ParseEXP());
+            expect(ecs.definitions.length).to.equal(653);
+            expect(ecs.components.length).to.equal(704);
         });
     });
 });

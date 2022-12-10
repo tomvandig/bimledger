@@ -1,4 +1,4 @@
-import { ComponentAttributeInstance, ComponentAttributeType, ComponentAttributeValue, ComponentDefinition, ComponentSchema, ComponentTypeToString, NamedComponentAttributeInstance } from "./bl_cli";
+import { Component, ComponentAttributeInstance, ComponentAttributeType, ComponentAttributeValue, ComponentDefinition, ComponentSchema, ComponentTypeToString, ECS, NamedComponentAttributeInstance } from "./bl_cli";
 
 enum IfcTokenType
 {
@@ -304,11 +304,27 @@ export default function ConvertIFCToECS(stringData: string, definitions: Compone
         schemaMap[ComponentTypeToString(def.id)] = def;
     });
 
+    let components: Component[] = [];
+
     for (let i = 0; i < parser._lines.length; i++)
     {
-        let result = ParseLineToSchema(parser._lines[i], schemaMap);
-        // console.log(JSON.stringify(result, null, 4));
+        let line = parser._lines[i];
+        let result = ParseLineToSchema(line, schemaMap);
+        let component: Component = {
+            ref: line.id,
+            hash: "",
+            guid: null,
+            type: line.type.split("::"),
+            data: result   
+        }
+
+        components.push(component);
     }
+
+    return {
+        definitions,
+        components
+    } as ECS;
 }
 
 class Line {

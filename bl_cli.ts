@@ -258,7 +258,7 @@ function attributeValueEqual(left: ComponentAttributeInstance, right: ComponentA
 
         for (let i = 0; i < left.val.length; i++)
         {
-            if (!attributeValueEqual(left.val[i], right.val[i], attrValue.child))
+            if (!attributeValueEqual(left.val[i], right.val[i], attrValue.child as ComponentAttributeValue))
             {
                 return false;
             }
