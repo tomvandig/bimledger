@@ -93,7 +93,36 @@ describe('Unit Tests', function () {
     });
 });
 
+describe('Unit Tests', function () {
+    describe('Reference values', function () {
+        it('Reference values should be updated inside component data', function () {
 
+            let propDef = GetExamplePropDefinition();
+            let propSetDef = GetExamplePropSetDefinition();
+
+            let ECS2 = new ECS(
+                [propDef, propSetDef],
+                [
+                    GetExampleObject(4, null, propDef, [ MakeAttr("name", MakeString("myprop1")) ]),
+                    GetExampleObject(5, null, propDef, [ MakeAttr("name", MakeString("myprop4")) ]),
+                    GetExampleObject(2, "1", propSetDef, [ MakeAttr("properties", MakeArray([MakeRef(4), MakeRef(5)]))] )
+                ]
+            );
+            
+            SetVerbose(true);
+            let initialTransaction = DiffECS(new ECS([], []), ECS2);
+
+            console.log(JSON.stringify(initialTransaction, null, 4));
+
+            let set = initialTransaction.delta.components.added.filter(c => c.guid === "1")[0];
+            expect(set.data[0].val.val[0].val).to.equal(2);
+            expect(set.data[0].val.val[0].val).to.equal(3);
+            
+        });
+    });
+});
+
+/*
 describe('Unit Tests', function () {
     describe('EXP parsing', function () {
         it('EXP should parse', function () {
@@ -111,3 +140,4 @@ describe('Unit Tests', function () {
         });
     });
 });
+*/
