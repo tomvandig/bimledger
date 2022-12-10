@@ -198,14 +198,15 @@ function HashComponent(comp: Component, ecs: ECS, refMap: {[index: number]:Compo
         {
             if (attr.type === ComponentAttributeType.REF)
             {
-                if (attr.val)
+                if (attr.val && attr.val !== comp.ref)
                 {
-                    let comp = refMap[attr.val];
-                    if (!comp)
+                    console.log(attr.val);
+                    let childComp = refMap[attr.val];
+                    if (!childComp)
                     {
                         throw new Error(`Unknown component reference ${attr.val}`);
                     }
-                    hash.push(HashComponent(comp, ecs, refMap));
+                    hash.push(HashComponent(childComp, ecs, refMap));
                 }
             }
             else
@@ -520,11 +521,9 @@ function BuildHashDiff(left: ECS, right: ECS, refMapLeft: {[index: number]:Compo
 {
     let diff = new HashDifference();
     
-    console.log(`hash2`);
     diff.hashToRefLeft = BuildHashMap(left, refMapLeft);
+    console.log(`e`);
     diff.hashToRefRight = BuildHashMap(right, refMapRight);
-
-    console.log(`hash1`);
 
     // check left for status quo
     Object.keys(diff.hashToRefLeft).forEach((hash) => {
@@ -695,6 +694,23 @@ function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDiffere
     return lockedReferences;
 }
 
+function UpdateComponentRefsToMatchLeft(comp: Component, newLeftRefForNewRightRef: any)
+{
+    VisitAttributes(comp, (attr: ComponentAttributeInstance) => {
+        if (attr.type === ComponentAttributeType.REF)
+        {
+            let newRef = newLeftRefForNewRightRef[attr.val];
+
+            if (!newRef)
+            {
+                throw new Error(`Unknown new left ref for ${attr.val}`);
+            }
+            
+            attr.val = newRef;
+        }
+    });
+}
+
 export function DiffECS(left: ECS, right: ECS): Transaction
 {
     let nextRef = GetMaxRef(left) + 1;
@@ -702,8 +718,8 @@ export function DiffECS(left: ECS, right: ECS): Transaction
     let refMapLeft = BuildRefMap(left);
     let refMapRight = BuildRefMap(right);
 
-    let referenceTreeLeft = BuildReferenceTree(left);
-    let referenceTreeRight = BuildReferenceTree(right);
+    // let referenceTreeLeft = BuildReferenceTree(left);
+    // let referenceTreeRight = BuildReferenceTree(right);
 
     let schemaMapLeft = BuildSchemaMap(left);
     let schemaMapRight = BuildSchemaMap(right);
@@ -713,9 +729,7 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         expired: []
     };
 
-    console.log("map", schemaMapLeft);
     let schemaMap = MergeSchemaMap(schemaMapLeft, schemaMapRight, definitionsDelta);
-    console.log("e");
 
     let hashDiff = BuildHashDiff(left, right, refMapLeft, refMapRight);
     let guidsDiff = BuildGuidsDiff(left, right);
@@ -753,19 +767,47 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         }
     });
 
+    let newLeftRefForNewRightRef = {};
+    
+    Object.keys(refMapRight).forEach((refRight) => {
+        let refLeft = lockedReferences[refRight];
+
+        if (refLeft)
+        {
+            newLeftRefForNewRightRef[refRight] = refLeft;
+        }
+        else
+        {
+            newLeftRefForNewRightRef[refRight] = nextRef++;
+        }
+    });
+
     Object.keys(refMapRight).forEach((refRight) => {
         let refLeft = lockedReferences[refRight];
 
         if (refLeft)
         {
             // this ref is a match!
+            UpdateComponentRefsToMatchLeft(refMapRight[refRight], newLeftRefForNewRightRef);
+
             let modification = MakeModifiedComponent(refMapLeft[refLeft], refMapRight[refRight], schemaMap);
             if (modification) allModifiedComponents.push(modification);
         }
         else
         {
             // this ref is new!
-            allAddedComponents.push(MakeCreatedComponent(refMapRight[refRight], nextRef++));
+            let newLeftRef = newLeftRefForNewRightRef[refRight];
+
+            if (!newLeftRef)
+            {
+                // this is unknown
+                throw new Error(`Missing mapping to left ref!`);
+            }
+            else
+            {
+                UpdateComponentRefsToMatchLeft(refMapRight[refRight], newLeftRefForNewRightRef);
+                allAddedComponents.push(MakeCreatedComponent(refMapRight[refRight], newLeftRef));
+            }
         }
     });
     

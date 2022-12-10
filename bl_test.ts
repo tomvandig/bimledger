@@ -116,7 +116,7 @@ describe('Unit Tests', function () {
 
             let set = initialTransaction.delta.components.added.filter(c => c.guid === "1")[0];
             expect(set.data[0].val.val[0].val).to.equal(2);
-            expect(set.data[0].val.val[0].val).to.equal(3);
+            expect(set.data[0].val.val[1].val).to.equal(3);
             
         });
     });
