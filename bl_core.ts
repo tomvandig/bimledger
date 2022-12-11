@@ -493,6 +493,9 @@ function MergeSchemaMap(left: any, right: any, delta: DefinitionsDelta)
 
 function VisitAttribute(attr: ComponentAttributeInstance, fn: (ComponentAttributeInstance)=>void)
 {
+    // TODO: this code is horribly outdated and will fail to find nested attributes for a bunch of ComponentAttributeTypes
+    // first decide on better naming: attribute is top level item, but attribute instance should be renamed 
+    // after rename, properly create visitor structure
     if (attr.type === ComponentAttributeType.ARRAY)
     {
         fn(attr);
