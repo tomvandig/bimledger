@@ -864,6 +864,10 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         }
     });
 
+    // TODO: look at removed/added component pairs to figure out which references can be carried over from old to new components
+    // since we have freedom to use any reference from removed components as we wish, we can simply grab an added component that is most similar
+    // reference repair will pick up the changes
+    // such a mapping can then be transformed to a component modification, which is probably what the user wants in the end
     let newLeftRefForNewRightRef = {};
     
     Object.keys(refMapRight).forEach((refRight) => {
