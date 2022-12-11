@@ -112,12 +112,34 @@ describe('Unit Tests', function () {
             SetVerbose(true);
             let initialTransaction = DiffECS(new ECS([], []), ECS2);
 
-            console.log(JSON.stringify(initialTransaction, null, 4));
-
             let set = initialTransaction.delta.components.added.filter(c => c.guid === "1")[0];
             expect(set.data[0].val.val[0].val).to.equal(2);
             expect(set.data[0].val.val[1].val).to.equal(3);
             
+        });
+    });
+});
+
+describe('Unit Tests', function () {
+    describe('Hash collisions', function () {
+        it('Hash collisions are cleared up when ECS is constructed', function () {
+
+            let propDef = GetExamplePropDefinition();
+            let propSetDef = GetExamplePropSetDefinition();
+
+            let ECS2 = new ECS(
+                [propDef, propSetDef],
+                [
+                    GetExampleObject(1, null, propDef, [ MakeAttr("name", MakeString("myprop1")) ]),
+                    GetExampleObject(2, null, propDef, [ MakeAttr("name", MakeString("myprop1")) ]),
+                    GetExampleObject(3, "1", propSetDef, [ MakeAttr("properties", MakeArray([MakeRef(1), MakeRef(2)]))] )
+                ]
+            );
+            
+            expect(ECS2.components.length).to.equal(2);
+            let obj = ECS2.GetComponentByRef(3).data[0].val.val;
+            expect(obj[0].val).to.equal(1);
+            expect(obj[1].val).to.equal(1);
         });
     });
 });
