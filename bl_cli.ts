@@ -27,6 +27,7 @@ let command = args[0];
 
 let ADD_COMMAND = "add";
 let HELP_COMMAND = "help";
+let STATUS_COMMAND = "status";
 
 if (command === ADD_COMMAND)
 {
@@ -61,8 +62,21 @@ if (command === ADD_COMMAND)
     fs.writeFileSync(ECS_NAME, JSON.stringify(new_ecs, null, 4));
     console.log(`Writing new ledger`);
     fs.writeFileSync(LEDGER_NAME, JSON.stringify(ledger, null, 4));
+}
+else if (command === STATUS_COMMAND)
+{
+    let ledger = fs.existsSync(LEDGER_NAME) ? JSON.parse(fs.readFileSync(LEDGER_NAME).toString()) as Ledger : { transactions: [] } as Ledger;
+    console.log(`Ledger has ${ledger.transactions.length} transactions: `);
+    ledger.transactions.forEach((transaction) => {
+        console.log(`Transaction`);
+        console.log(` - with ${transaction.delta.definitions.created.length} created definitions`);
+        console.log(` - with ${transaction.delta.definitions.expired.length} expired definitions`);
+        console.log(` - with ${transaction.delta.components.added.length} added components`);
+        console.log(` - with ${transaction.delta.components.modified.length} modified components`);
+        console.log(` - with ${transaction.delta.components.removed.length} removed components`);
 
 
+    })
 }
 else if (command === HELP_COMMAND)
 {
