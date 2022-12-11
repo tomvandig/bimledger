@@ -738,6 +738,8 @@ export function DiffECS(left: ECS, right: ECS): Transaction
     if (verbose)
     {
         console.log(`hash matches: ${hashDiff.matchingHashes}`);
+        console.log(`hash matches: ${left.components.length}`);
+        console.log(`hash matches: ${right.components.length}`);
         console.log(`hash added: ${hashDiff.addedHashes}`);
         console.log(`hash removed: ${hashDiff.removedHashes}`);
 
