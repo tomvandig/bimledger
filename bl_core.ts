@@ -143,6 +143,55 @@ export class ECS
     {
         this.definitions = defs;
         this.components = comps;
+
+        this.cleanupHashes();
+    }
+
+    cleanupHashes()
+    {
+        let refmap = BuildRefMap(this);
+        let equivalenceMap = BuildEquivalenceHashMap(this, refmap);
+
+        if (Object.keys(equivalenceMap).length === 0)
+        {
+            // all hashes unique!
+            return;
+        }
+        else
+        {
+            // update all components to point to the unique hashes
+            this.components.forEach((comp) => {
+                VisitAttributes(comp, (attr: ComponentAttributeInstance) => {
+                    if (attr.type === ComponentAttributeType.REF)
+                    {
+                        if (attr.val)
+                        {
+                            let replacementRef = equivalenceMap[attr.val];
+
+                            if (!replacementRef)
+                            {
+                                // this hash is unique!
+                                return;
+                            }
+                            
+                            attr.val = replacementRef;
+                        }
+                    }
+                });
+            });
+
+            // remove components which have a duplicate hash
+            for (let i = 0; i < this.components.length; i++)
+            {
+                let comp = this.components[i];
+                if (equivalenceMap[comp.ref])
+                {
+                    this.components[i] = null;
+                }
+            }
+
+            this.components = this.components.filter(c => c !== null);
+        }
     }
 
 
@@ -200,7 +249,6 @@ function HashComponent(comp: Component, ecs: ECS, refMap: {[index: number]:Compo
             {
                 if (attr.val && attr.val !== comp.ref)
                 {
-                    console.log(attr.val);
                     let childComp = refMap[attr.val];
                     if (!childComp)
                     {
@@ -219,14 +267,59 @@ function HashComponent(comp: Component, ecs: ECS, refMap: {[index: number]:Compo
     return spark.hash(hash.join(","));
 }
 
-function BuildHashMap(ecs: ECS, refMap: {[index: number]:Component})
+function BuildEquivalenceHashMap(ecs: ECS, refMap: {[index: number]:Component})
 {
     let map = {};
+    let hashEquivalenceMap = {};
+
     ecs.components.forEach(comp => {
         if (!comp.guid)
         {
             comp.hash = HashComponent(comp, ecs, refMap);
-            map[comp.hash] = comp.ref;
+
+            if (comp.hash === null)
+            {
+                throw new Error(`Null hash for component ${comp}`);
+            }
+
+            if (map[comp.hash])
+            {
+                // duplicate hash! Assume duplicate hash means identical component following git behavior, TODO: switch from md5 to SHA-1
+                hashEquivalenceMap[comp.ref] = map[comp.hash];
+            }
+            else
+            {
+                map[comp.hash] = comp.ref;
+            }
+        }
+    });
+
+    return hashEquivalenceMap;
+}
+
+function BuildHashMap(ecs: ECS, refMap: {[index: number]:Component})
+{
+    let map = {};
+
+    ecs.components.forEach(comp => {
+        if (!comp.guid)
+        {
+            comp.hash = HashComponent(comp, ecs, refMap);
+
+            if (comp.hash === null)
+            {
+                throw new Error(`Null hash for component ${comp}`);
+            }
+
+            if (map[comp.hash])
+            {
+                // duplicate hashes should have been corrected when the ECS is built, this is a bug!
+                throw new Error(`Duplicate hash while building hashmap, this is a bug!`);
+            }
+            else
+            {
+                map[comp.hash] = comp.ref;
+            }
         }
     });
     return map;
@@ -699,14 +792,17 @@ function UpdateComponentRefsToMatchLeft(comp: Component, newLeftRefForNewRightRe
     VisitAttributes(comp, (attr: ComponentAttributeInstance) => {
         if (attr.type === ComponentAttributeType.REF)
         {
-            let newRef = newLeftRefForNewRightRef[attr.val];
-
-            if (!newRef)
+            if (attr.val)
             {
-                throw new Error(`Unknown new left ref for ${attr.val}`);
+                let newRef = newLeftRefForNewRightRef[attr.val];
+
+                if (!newRef)
+                {
+                    throw new Error(`Unknown new left ref for ${attr.val}`);
+                }
+                
+                attr.val = newRef;
             }
-            
-            attr.val = newRef;
         }
     });
 }
@@ -740,6 +836,7 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         console.log(`hash matches: ${hashDiff.matchingHashes}`);
         console.log(`hash matches: ${left.components.length}`);
         console.log(`hash matches: ${right.components.length}`);
+        console.log(`hash matches: ${hashDiff.matchingHashes.length}`);
         console.log(`hash added: ${hashDiff.addedHashes}`);
         console.log(`hash removed: ${hashDiff.removedHashes}`);
 
@@ -749,11 +846,9 @@ export function DiffECS(left: ECS, right: ECS): Transaction
     }
 
     let lockedReferences = BuildLockedReferences(hashDiff, guidsDiff, refMapLeft, refMapRight);
-    console.log(`locked`, lockedReferences);
 
     let invertedLockedReferences = {};
     Object.keys(lockedReferences).forEach((refRight) => invertedLockedReferences[lockedReferences[refRight]] = refRight);
-    console.log(`!locked`, invertedLockedReferences);
 
     let allRemovedComponents = [];
     let allModifiedComponents = [];
