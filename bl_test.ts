@@ -1,8 +1,8 @@
 
 import { expect } from 'chai';
-import { BuildECS, DiffECS, ECS, Ledger, RehashECS, SetVerbose } from './bl_core';
+import { BuildECS, Component, ComponentAttributeInstance, DiffECS, ECS, Ledger, RehashECS, SetVerbose, VisitAttributes } from './bl_core';
 import { describe, it } from "./crappucino";
-import { GetExampleObject, GetExamplePropDefinition, GetExamplePropSetDefinition, MakeArray, MakeAttr, MakeRef, MakeString } from './example';
+import { GetExampleObject, GetExamplePropDefinition, GetExamplePropSetDefinition, MakeArray, MakeAttr, MakeLabel, MakeNumber, MakeRef, MakeSelect, MakeString } from './example';
 import { findSubClasses, ParseEXP } from './exp2ecs';
 import ConvertIFCToECS from './ifc2ecs';
 import { ifcdata } from './ifcdata';
@@ -144,7 +144,6 @@ describe('Unit Tests', function () {
     });
 });
 
-/*
 describe('Unit Tests', function () {
     describe('EXP parsing', function () {
         it('EXP should parse', function () {
@@ -158,8 +157,39 @@ describe('Unit Tests', function () {
         it('IFC should parse', function () {
             let ecs = ConvertIFCToECS(ifcdata, ParseEXP());
             expect(ecs.definitions.length).to.equal(653);
-            expect(ecs.components.length).to.equal(704);
+            expect(ecs.components.length).to.equal(579);
         });
     });
 });
-*/
+
+describe('Unit Tests', function () {
+    describe('Visiting', function () {
+        it('Visiting should visit everything', function () {
+
+            let component: Component = {
+                ref:0,
+                hash: "",
+                guid: null,
+                type: [],
+                data: [ 
+                    MakeAttr("name", 
+                    MakeArray([
+                        MakeString("myprop1"),
+                        MakeNumber(2.3),
+                        MakeRef(1),
+                        MakeLabel("type", MakeRef(2)),
+                        MakeSelect(MakeRef(2)),
+                    ]))
+                ]
+            };
+
+            let attrs: ComponentAttributeInstance[] = [];
+            VisitAttributes(component, (attr: ComponentAttributeInstance) => {
+                console.log(attr.type);
+                attrs.push(attr);
+            });
+
+            expect(attrs.length).to.equal(8);
+        });
+    });
+});

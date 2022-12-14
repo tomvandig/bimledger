@@ -52,11 +52,9 @@ export function GetExampleObject(ref: number, guid: string | null, def: any, dat
 }
 
 /*
-    NUMBER,
-    STRING,
-    ARRAY,
-    LABEL,
-    REF
+    BOOLEAN,
+    BINARY,
+    LOGICAL,
 */
 
 export function MakeAttr(name: string, val: ComponentAttributeInstance)
@@ -74,17 +72,22 @@ export function MakeRef(num: number)
     return { type: ComponentAttributeType.REF, val: num } as ComponentAttributeInstance;
 }
 
-export function MakeString(str: String)
+export function MakeString(str: string)
 {
     return { type: ComponentAttributeType.STRING, val: str } as ComponentAttributeInstance;
 }
 
-export function MakeLabel(str: String)
+export function MakeLabel(namedType: string, child: any)
 {
-    return { type: ComponentAttributeType.LABEL, val: str } as ComponentAttributeInstance;
+    return { type: ComponentAttributeType.LABEL, namedType, val: child } as ComponentAttributeInstance;
 }
 
 export function MakeArray(a: any[])
 {
     return { type: ComponentAttributeType.ARRAY, val: a } as ComponentAttributeInstance;
+}
+
+export function MakeSelect(a: any)
+{
+    return { type: ComponentAttributeType.SELECT, val: a } as ComponentAttributeInstance;
 }

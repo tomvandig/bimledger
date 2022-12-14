@@ -46,7 +46,7 @@ export interface ComponentAttributeInstance
 {
     type: ComponentAttributeType;
     namedType: string;
-    val: any;
+    val: number | string | boolean | ComponentAttributeInstance | ComponentAttributeInstance[];
 }
 
 export interface NamedComponentAttributeInstance
@@ -166,7 +166,8 @@ export class ECS
                     {
                         if (attr.val)
                         {
-                            let replacementRef = equivalenceMap[attr.val];
+                            let val = attr.val as number;
+                            let replacementRef = equivalenceMap[val];
 
                             if (!replacementRef)
                             {
@@ -243,24 +244,32 @@ function HashComponent(comp: Component, ecs: ECS, refMap: {[index: number]:Compo
 {
     let hash = [comp.guid, ...comp.type];
     VisitAttributes(comp, (attr: ComponentAttributeInstance) => {
-        if (attr.type !== ComponentAttributeType.ARRAY)
+        let hasNestedObj = attr.type === ComponentAttributeType.ARRAY || 
+                           attr.type === ComponentAttributeType.SELECT ||
+                           attr.type === ComponentAttributeType.LABEL; 
+
+        if (hasNestedObj) 
         {
-            if (attr.type === ComponentAttributeType.REF)
+            // hashing this makes no sense, we want to hash the children
+            return;
+        }
+                           
+        if (attr.type === ComponentAttributeType.REF)
+        {
+            if (attr.val && attr.val !== comp.ref)
             {
-                if (attr.val && attr.val !== comp.ref)
+                let val = attr.val as number;
+                let childComp = refMap[val];
+                if (!childComp)
                 {
-                    let childComp = refMap[attr.val];
-                    if (!childComp)
-                    {
-                        throw new Error(`Unknown component reference ${attr.val}`);
-                    }
-                    hash.push(HashComponent(childComp, ecs, refMap));
+                    throw new Error(`Unknown component reference ${val}`);
                 }
+                hash.push(HashComponent(childComp, ecs, refMap));
             }
-            else
-            {
-                hash.push(attr.val);
-            }
+        }
+        else
+        {
+            hash.push(attr.val as any);
         }
     })
 
@@ -339,18 +348,30 @@ function MakeCreatedComponent(comp: Component, ref: Reference)
 
 function attributeValueEqual(left: ComponentAttributeInstance, right: ComponentAttributeInstance, attrValue: ComponentAttributeValue)
 {
-    if (attrValue.type !== left.type)
-    {
-        throw new Error(`Type ${attrValue.type} does not match left type ${left.type}`)
-    }
-    
-    if (attrValue.type !== right.type)
-    {
-        throw new Error(`Type ${attrValue.type} does not match right type ${right.type}`)
-    }
+    // console.log(left, right);
+    // if (attrValue.type !== ComponentAttributeType.SELECT)
+    // {
 
-    if (attrValue.type === ComponentAttributeType.ARRAY)
+    // if (attrValue.type !== left.type)
+    // {
+    //     throw new Error(`Type ${attrValue.type} does not match left type ${left.type}`)
+    // }
+    
+    // if (attrValue.type !== right.type)
+    // {
+    //     throw new Error(`Type ${attrValue.type} does not match right type ${right.type}`)
+    // }
+    //     return attributeValueEqual(left, right, attrValue.child as ComponentAttributeValue);
+    // }
+
+    // no need to check select here
+    if (left.type === ComponentAttributeType.ARRAY)
     {
+        if (!(left.val && right.val))
+        {
+            return left.val === right.val;
+        }
+
         // good luck
         if (left.val.length !== right.val.length)
         {
@@ -359,13 +380,22 @@ function attributeValueEqual(left: ComponentAttributeInstance, right: ComponentA
 
         for (let i = 0; i < left.val.length; i++)
         {
-            if (!attributeValueEqual(left.val[i], right.val[i], attrValue.child as ComponentAttributeValue))
+            if (!attributeValueEqual(left.val[i], right.val[i], null))
             {
                 return false;
             }
         }
 
         return true;
+    }
+    else if (left.type === ComponentAttributeType.LABEL)
+    {
+        if (left.namedType !== right.namedType)
+        {
+            return false;
+        }
+
+        attributeValueEqual(left.val as ComponentAttributeInstance, right.val as ComponentAttributeInstance, null)
     }
     else
     {
@@ -407,7 +437,7 @@ function BuildModifications(left: Component, right: Component, schema: Component
     schema.attributes.forEach((attr) => {
         if (!attributeEqual(left, right, attr))
         {
-            let newValue = GetAttrByName(attr.name, left);
+            let newValue = GetAttrByName(attr.name, right);
             if (newValue)
             {
                 modifications.push({ attributeName: attr.name, newValue: newValue.val } as ComponentModification)
@@ -434,6 +464,11 @@ function MakeModifiedComponent(left: Component, right: Component, schemaMap: any
     let ccomp: ModifiedComponent = {
         ref: left.ref, // left is source of truth
         modifications: BuildModifications(left, right, componentDefinition.schema)
+    }
+
+    if (ccomp.modifications.length === 0)
+    {
+        return false;
     }
 
     return ccomp;
@@ -493,24 +528,39 @@ function MergeSchemaMap(left: any, right: any, delta: DefinitionsDelta)
 
 function VisitAttribute(attr: ComponentAttributeInstance, fn: (ComponentAttributeInstance)=>void)
 {
-    // TODO: this code is horribly outdated and will fail to find nested attributes for a bunch of ComponentAttributeTypes
-    // first decide on better naming: attribute is top level item, but attribute instance should be renamed 
-    // after rename, properly create visitor structure
     if (attr.type === ComponentAttributeType.ARRAY)
     {
         fn(attr);
         if (attr.val)
         {
-            attr.val.forEach((ncai) => VisitAttribute(ncai, fn));
+            let attributes = attr.val as ComponentAttributeInstance[];
+            attributes.forEach((ncai) => VisitAttribute(ncai, fn));
+        }
+    }
+    else if (attr.type === ComponentAttributeType.LABEL)
+    {
+        fn(attr);
+        if (attr.val)
+        {
+            VisitAttribute(attr.val as ComponentAttributeInstance, fn);
+        }
+    }
+    else if (attr.type === ComponentAttributeType.SELECT)
+    {
+        fn(attr);
+        if (attr.val)
+        {
+            VisitAttribute(attr.val as ComponentAttributeInstance, fn);
         }
     }
     else
     {
+        // non-nested type
         fn(attr);
     }
 }
 
-function VisitAttributes(comp: Component, fn: (ComponentAttributeInstance)=>void)
+export function VisitAttributes(comp: Component, fn: (ComponentAttributeInstance)=>void)
 {
     comp.data.forEach((ncai) => {
         VisitAttribute(ncai.val, fn);
@@ -523,7 +573,10 @@ function GetRefsFromComponent(comp: Component)
     VisitAttributes(comp, (attr: ComponentAttributeInstance) => {
         if (attr.type === ComponentAttributeType.REF)
         {
-            refs.push(attr.val);
+            if (attr.val)
+            {
+                refs.push(attr.val as number);
+            }
         }
     })
     return refs;
@@ -722,7 +775,12 @@ function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDiffere
 
     let newlyLockedReferences = [];
     guidsDiff.matchingGuids.forEach((guid) => {
-        newlyLockedReferences.push(guidsDiff.guidToRefRight[guid]);
+        let refR = guidsDiff.guidToRefRight[guid];
+        if (!refR)
+        {
+            throw new Error(`Unknown right ref for guid ${guid}`);
+        }
+        newlyLockedReferences.push(refR);
     });
 
     while(true)
@@ -734,6 +792,13 @@ function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDiffere
 
             let compL = refMapLeft[refL];
             let compR = refMapRight[refR];
+
+            if (!compL || !compR)
+            {
+                console.log(refL, refR);
+                console.log(compL, compR);
+                throw new Error(`Comp mismtach!`);
+            }
 
             let refsL = GetRefsFromComponent(compL);
             let refsR = GetRefsFromComponent(compR);
@@ -834,7 +899,7 @@ export function DiffECS(left: ECS, right: ECS): Transaction
     let guidsDiff = BuildGuidsDiff(left, right);
     console.log("d");
     
-    if (verbose)
+    if (true)
     {
         console.log(`hash matches: ${hashDiff.matchingHashes}`);
         console.log(`hash matches: ${left.components.length}`);

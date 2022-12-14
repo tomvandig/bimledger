@@ -275,6 +275,19 @@ function ParseLineToSchema(line: Line, schemaMap: any)
     return new LineParser(line.data, definition.schema).ParseLineDataToSchema();
 }
 
+function FindGuidForComponent(component: NamedComponentAttributeInstance[])
+{
+    let guid = null;
+    component.forEach((attr) => {
+        if (attr.name === "GlobalId")
+        {
+            guid = attr.val.val;
+        }
+    })
+
+    return guid;
+}
+
 export default function ConvertIFCToECS(stringData: string, definitions: ComponentDefinition[])
 {
     let tokenizer = new Tokenizer();
@@ -313,8 +326,8 @@ export default function ConvertIFCToECS(stringData: string, definitions: Compone
         let component: Component = {
             ref: line.id,
             hash: "",
-            guid: null,
-            type: line.type.split("::"),
+            guid: FindGuidForComponent(result),
+            type: ["ifc2x3", line.type.toLocaleLowerCase()],
             data: result   
         }
 
