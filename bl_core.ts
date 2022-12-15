@@ -286,7 +286,7 @@ function BuildEquivalenceHashMap(ecs: ECS, refMap: {[index: number]:Component})
         {
             comp.hash = HashComponent(comp, ecs, refMap);
 
-            if (comp.hash === null)
+            if (comp.hash === null || comp.hash === '')
             {
                 throw new Error(`Null hash for component ${comp}`);
             }
@@ -422,6 +422,7 @@ function attributeEqual(left: Component, right: Component, attr: ComponentAttrib
     else
     {
         // left or right does not match the schema!
+        console.log(left, right);
         throw new Error(`Schema mismatch for attribute ${attr.name}`);
     }
 }
@@ -810,11 +811,22 @@ function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDiffere
             }
             else
             {
-                // same set of refs, lets try to match them together naively
+                // TODO: found real life examples where types are mixed and references moved within the set, good to do more intelligent mapping
+                // same amount of refs, lets try to match them together naively
                 for (let i = 0; i < refsL.length; i++)
                 {
                     let refL = refsL[i];
                     let refR = refsR[i];
+
+                    let compL = refMapLeft[refL];
+                    let compR = refMapRight[refR];
+
+                    // to match these, they must have the same type!
+                    if (ComponentTypeToString(compL.type) !== ComponentTypeToString(compR.type))
+                    {
+                        // differing types, no idea what to do, skip this
+                        continue;
+                    }
                     
                     if (lockedReferences[refR])
                     {

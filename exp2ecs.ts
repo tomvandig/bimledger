@@ -16,6 +16,7 @@ interface Prop {
     primitive: boolean;
     optional: boolean;
     set: boolean;
+    setOfSet: boolean;
 }
 
 interface InverseProp {
@@ -247,6 +248,8 @@ export function sortEntities(entities: Entity[]) {
               let name = split[0];
               let optional = split.indexOf("OPTIONAL") != -1;
               let set = split.indexOf("SET") != -1 || split.indexOf("LIST") != -1;
+              let setOfSet = split.filter(s => s === "LIST").length === 2; // beautiful
+
               let type = split[split.length - 1].replace(";", "");
               let firstBracket = type.indexOf("(");
               if (firstBracket != -1)
@@ -259,7 +262,8 @@ export function sortEntities(entities: Entity[]) {
                   type: tsType,
                   primitive: tsType !== type,
                   optional,
-                  set
+                  set,
+                  setOfSet
               })
           }
       }
@@ -321,13 +325,9 @@ export function ParseEXP()
     completeEntityList.add("FILE_DESCRIPTION");
     let completeifcElementList = new Set();
 
-    var files = fs.readdirSync("./");
-    for (var i = 0; i < files.length; i++) {
-    if (!files[i].endsWith(".exp")) continue;
-    var schemaName = files[i].replace(".exp","");
-    console.log("Generating Schema for:"+schemaName);
+    let filename = "./IFC4.exp";
 
-    let schemaData = fs.readFileSync("./"+files[i]).toString();
+    let schemaData = fs.readFileSync(filename).toString();
     let parsed = parseElements(schemaData);
     let entities = sortEntities(parsed.entities);
     let types = parsed.types;
@@ -426,15 +426,40 @@ export function ParseEXP()
             }
             else if (_type.isList)
             {
-                return {
-                    type: ComponentAttributeType.ARRAY,
-                    optional: false,
-                    child: {
-                        type: PropTypeToAttrType(_type.typeName),
+                let obj = nameToObj[_type.typeName];
+
+                if (obj && obj.isEntity)
+                {
+                    return {
+                        type: ComponentAttributeType.ARRAY,
                         optional: false,
-                        child: null
+                        child: {
+                            type: ComponentAttributeType.REF,
+                            optional: false,
+                            child: null
+                        } as ComponentAttributeValue
                     } as ComponentAttributeValue
-                } as ComponentAttributeValue
+                }
+                else if (obj && obj.isType)
+                {
+                    return {
+                        type: ComponentAttributeType.ARRAY,
+                        optional: false,
+                        child: ToChildAttrVal(obj)
+                    } as ComponentAttributeValue
+                }
+                else
+                {
+                    return {
+                        type: ComponentAttributeType.ARRAY,
+                        optional: false,
+                        child: {
+                            type: PropTypeToAttrType(_type.typeName),
+                            optional: false,
+                            child: null
+                        } as ComponentAttributeValue
+                    } as ComponentAttributeValue
+                }
             }
             else if (_type.isSelect)
             {
@@ -480,7 +505,23 @@ export function ParseEXP()
         {
             let type = PropTypeToAttrType(prop.type)
 
-            if (prop.set)
+            if (prop.setOfSet)
+            {
+                return {
+                    type: ComponentAttributeType.ARRAY,
+                    optional: prop.optional,
+                    child: {
+                        type: ComponentAttributeType.ARRAY,
+                        optional: false,
+                        child: {
+                            type: type,
+                            optional: false,
+                            child: null
+                        }
+                    }
+                } as ComponentAttributeValue
+            }
+            else if (prop.set)
             {
                 return {
                     type: ComponentAttributeType.ARRAY,
@@ -500,6 +541,18 @@ export function ParseEXP()
                     child: null
                 } as ComponentAttributeValue
             }
+        }
+        else if (prop.setOfSet)
+        {
+            return {
+                type: ComponentAttributeType.ARRAY,
+                optional: prop.optional,
+                child: {
+                    type: ComponentAttributeType.ARRAY,
+                    optional: false,
+                    child: ToChildAttrVal(propType)
+                }
+            } as ComponentAttributeValue
         }
         else if (prop.set)
         {
@@ -551,8 +604,4 @@ export function ParseEXP()
     let definitions = entities.map(e => ToComponentDefinition(e));
 
     return definitions;
-    }
-
-    //finish writing the TS metaData
-    console.log(`...Done!`);
 }

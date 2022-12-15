@@ -183,11 +183,14 @@ class LineParser
                     }catch(e)
                     {
                         // nope not this one
+                       // console.log(e);
                     }
                 }
 
                 if (!attr)
                 {
+                   // console.log(this.data, this.data_ptr);
+                   // console.log(JSON.stringify(schemaValue, null, 4));
                     throw new Error(`None of the select types match!`);
                 }
                 else
@@ -239,6 +242,8 @@ class LineParser
 
         let attr = this.schema.attributes[this.schema_ptr++];
         let schemaValue = attr.value;
+
+       // console.log("schema", JSON.stringify(this.schema, null, 4));
 
         return {
             name: attr.name,
