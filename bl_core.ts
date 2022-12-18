@@ -91,6 +91,9 @@ export interface ComponentDefinition
     id: ComponentType;
     parent: null | ComponentType;
     ownership: string;
+    isEntity: boolean; // TODO: poorly named
+    isRelationShip: boolean;
+    isIfcOwnerHistory: boolean;
     schema: ComponentSchema;
 }
 
