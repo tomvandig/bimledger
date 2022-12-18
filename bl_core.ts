@@ -243,8 +243,13 @@ function BuildGuidMap(ecs: ECS)
     return map;
 }
 
-function HashComponent(comp: Component, ecs: ECS, refMap: {[index: number]:Component})
+function HashComponent(comp: Component, ecs: ECS, refMap: {[index: number]:Component}, compToHash: {[index: number]:string})
 {
+    if (compToHash[comp.ref])
+    {
+        return compToHash[comp.ref];
+    }
+
     let hash = [comp.guid, ...comp.type];
     VisitAttributes(comp, (attr: ComponentAttributeInstance) => {
         let hasNestedObj = attr.type === ComponentAttributeType.ARRAY || 
@@ -267,7 +272,7 @@ function HashComponent(comp: Component, ecs: ECS, refMap: {[index: number]:Compo
                 {
                     throw new Error(`Unknown component reference ${val}`);
                 }
-                hash.push(HashComponent(childComp, ecs, refMap));
+                hash.push(HashComponent(childComp, ecs, refMap, compToHash));
             }
         }
         else
@@ -276,18 +281,21 @@ function HashComponent(comp: Component, ecs: ECS, refMap: {[index: number]:Compo
         }
     })
 
-    return spark.hash(hash.join(","));
+    let finalHash = spark.hash(hash.join(","));
+    compToHash[comp.ref] = finalHash;
+    return finalHash;
 }
 
 function BuildEquivalenceHashMap(ecs: ECS, refMap: {[index: number]:Component})
 {
     let map = {};
+    let compToHash = {};
     let hashEquivalenceMap = {};
 
     ecs.components.forEach(comp => {
         if (!comp.guid)
         {
-            comp.hash = HashComponent(comp, ecs, refMap);
+            comp.hash = HashComponent(comp, ecs, refMap, compToHash);
 
             if (comp.hash === null || comp.hash === '')
             {
@@ -312,11 +320,12 @@ function BuildEquivalenceHashMap(ecs: ECS, refMap: {[index: number]:Component})
 function BuildHashMap(ecs: ECS, refMap: {[index: number]:Component})
 {
     let map = {};
+    let compToHash = {};
 
     ecs.components.forEach(comp => {
         if (!comp.guid)
         {
-            comp.hash = HashComponent(comp, ecs, refMap);
+            comp.hash = HashComponent(comp, ecs, refMap, compToHash);
 
             if (comp.hash === null)
             {
