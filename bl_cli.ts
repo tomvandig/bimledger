@@ -28,6 +28,7 @@ let command = args[0];
 let ADD_COMMAND = "add";
 let HELP_COMMAND = "help";
 let STATUS_COMMAND = "status";
+let LAST_COMMAND = "last";
 
 if (command === ADD_COMMAND)
 {
@@ -59,9 +60,9 @@ if (command === ADD_COMMAND)
     let new_ecs = BuildECS(ledger);
 
     console.log(`Writing new ECS`);
-    fs.writeFileSync(ECS_NAME, JSON.stringify(new_ecs, null, 4));
+    fs.writeFileSync(ECS_NAME, JSON.stringify(new_ecs));
     console.log(`Writing new ledger`);
-    fs.writeFileSync(LEDGER_NAME, JSON.stringify(ledger, null, 4));
+    fs.writeFileSync(LEDGER_NAME, JSON.stringify(ledger));
 }
 else if (command === STATUS_COMMAND)
 {
@@ -77,6 +78,13 @@ else if (command === STATUS_COMMAND)
 
 
     })
+}
+else if (command === LAST_COMMAND)
+{
+    let ledger = fs.existsSync(LEDGER_NAME) ? JSON.parse(fs.readFileSync(LEDGER_NAME).toString()) as Ledger : { transactions: [] } as Ledger;
+    console.log(`Ledger has ${ledger.transactions.length} transactions: `);
+    console.log(`Last transaction:`);
+    console.log(JSON.stringify(ledger.transactions[ledger.transactions.length - 1], null, 4));
 }
 else if (command === HELP_COMMAND)
 {
