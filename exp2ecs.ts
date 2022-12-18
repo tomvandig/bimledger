@@ -35,6 +35,8 @@ interface Entity {
     derivedProps: Prop[] | null;
     derivedInverseProps: InverseProp[] | null,
     isIfcProduct: boolean;
+    isIfcRelationship: boolean;
+    isIfcOwnerHistory: boolean;
     isEntity: boolean;
     isType: boolean;
 }
@@ -136,10 +138,17 @@ export function sortEntities(entities: Entity[]) {
                   inverseProps: [],
                   derivedInverseProps: [],
                   isIfcProduct: false,
+                  isIfcRelationship: false,
+                  isIfcOwnerHistory: false,
                   isEntity: true,
                   isType: false
               };
               if (name === "IfcProduct") entity.isIfcProduct = true;
+              if (name === "IfcRelationship") entity.isIfcRelationship = true;
+              if (name === "IfcPropertySetDefinition") entity.isIfcRelationship = true; // abuse ifcrelationship for its guid-clearing capabilities
+              if (name === "IfcElementType") entity.isIfcRelationship = true; // abuse ifcrelationship for its guid-clearing capabilities
+              if (name === "IfcOwnerHistory") entity.isIfcOwnerHistory = true;
+
               readProps = true;
               readInverse = false;
   
@@ -308,6 +317,7 @@ export function sortEntities(entities: Entity[]) {
       } else {
         walkParents(parent, entityList);
         if (parent.isIfcProduct) entity.isIfcProduct = true;
+        if (parent.isIfcRelationship) entity.isIfcRelationship = true;
         entity.derivedProps = [...parent.derivedProps, ...entity.props];
         entity.derivedInverseProps = [...parent.derivedInverseProps,...entity.inverseProps];
       }
@@ -595,6 +605,9 @@ export function ParseEXP()
             id: ["ifc2x3", e.name.toLocaleLowerCase()],
             parent: null,
             ownership: "any",
+            isEntity: e.isIfcProduct,
+            isRelationShip: e.isIfcRelationship,
+            isIfcOwnerHistory: e.isIfcOwnerHistory,
             schema: ToSchema(e.derivedProps)
         }
 

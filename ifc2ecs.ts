@@ -265,18 +265,8 @@ class LineParser
 
 }
 
-function ParseLineToSchema(line: Line, schemaMap: any)
+function ParseLineToSchema(line: Line, definition: ComponentDefinition)
 {
-    let lineType = ComponentTypeToString([`ifc2x3`, line.type.toLocaleLowerCase()]);
-    let definition = schemaMap[lineType] as ComponentDefinition;
-
-    // console.log(line);
-
-    if (!definition)
-    {
-        throw new Error(`Unknown line type ${lineType}`);
-    }
-
     return new LineParser(line.data, definition.schema).ParseLineDataToSchema();
 }
 
@@ -291,6 +281,24 @@ function FindGuidForComponent(component: NamedComponentAttributeInstance[])
     })
 
     return guid;
+}
+
+function ClearGuidForComponent(component: NamedComponentAttributeInstance[])
+{
+    component.forEach((attr) => {
+        if (attr.name === "GlobalId")
+        {
+            attr.val.val = "";
+        }
+    })
+}
+
+function ClearComponentValues(component: NamedComponentAttributeInstance[])
+{
+    component.forEach((attr) => {
+        attr.val.type = ComponentAttributeType.STRING
+        attr.val.val = "";
+    });
 }
 
 export default function ConvertIFCToECS(stringData: string, definitions: ComponentDefinition[])
@@ -327,11 +335,26 @@ export default function ConvertIFCToECS(stringData: string, definitions: Compone
     for (let i = 0; i < parser._lines.length; i++)
     {
         let line = parser._lines[i];
-        let result = ParseLineToSchema(line, schemaMap);
+        
+        let lineType = ComponentTypeToString([`ifc2x3`, line.type.toLocaleLowerCase()]);
+        let definition = schemaMap[lineType] as ComponentDefinition;
+
+        if (!definition)
+        {
+            throw new Error(`Unknown line type ${lineType}`);
+        }
+
+        let result = ParseLineToSchema(line, definition);
+
+        // we clear the guids of relationships since they don't appear to be consistent between revisions and clutter the diff
+        // other contenders for modified guids are: IFCELEMENTQUANTITY, IFCPROPERTYSET
+        if (definition.isRelationShip) ClearGuidForComponent(result);
+        if (definition.isIfcOwnerHistory) ClearComponentValues(result);
+
         let component: Component = {
             ref: line.id,
             hash: "",
-            guid: FindGuidForComponent(result),
+            guid: !definition.isRelationShip ? FindGuidForComponent(result) : null,
             type: ["ifc2x3", line.type.toLocaleLowerCase()],
             data: result   
         }
