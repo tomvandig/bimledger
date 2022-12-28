@@ -29,6 +29,7 @@ let ADD_COMMAND = "add";
 let HELP_COMMAND = "help";
 let STATUS_COMMAND = "status";
 let LAST_COMMAND = "last";
+let RESET_COMMAND = "reset";
 
 if (command === ADD_COMMAND)
 {
@@ -85,6 +86,11 @@ else if (command === LAST_COMMAND)
     console.log(`Ledger has ${ledger.transactions.length} transactions: `);
     console.log(`Last transaction:`);
     console.log(JSON.stringify(ledger.transactions[ledger.transactions.length - 1], null, 4));
+}
+else if (command === RESET_COMMAND)
+{
+    console.log(`Cleaning BL dir ${BL_DIR}`);
+    fs.rmdirSync(BL_DIR, { recursive: true});
 }
 else if (command === HELP_COMMAND)
 {
