@@ -243,7 +243,7 @@ function BuildGuidMap(ecs: ECS)
     return map;
 }
 
-function HashComponent(comp: Component, ecs: ECS, refMap: {[index: number]:Component}, compToHash: {[index: number]:string})
+function HashComponent(comp: Component, refMap: {[index: number]:Component}, compToHash: {[index: number]:string}, shallow: boolean = false)
 {
     if (compToHash[comp.ref])
     {
@@ -267,12 +267,21 @@ function HashComponent(comp: Component, ecs: ECS, refMap: {[index: number]:Compo
             if (attr.val && attr.val !== comp.ref)
             {
                 let val = attr.val as number;
-                let childComp = refMap[val];
-                if (!childComp)
+
+                // shallow means we don't follow references
+                if (shallow)
                 {
-                    throw new Error(`Unknown component reference ${val}`);
+                    hash.push(val as any);
                 }
-                hash.push(HashComponent(childComp, ecs, refMap, compToHash));
+                else
+                {
+                    let childComp = refMap[val];
+                    if (!childComp)
+                    {
+                        throw new Error(`Unknown component reference ${val}`);
+                    }
+                    hash.push(HashComponent(childComp, refMap, compToHash));
+                }
             }
         }
         else
@@ -295,7 +304,7 @@ function BuildEquivalenceHashMap(ecs: ECS, refMap: {[index: number]:Component})
     ecs.components.forEach(comp => {
         if (!comp.guid)
         {
-            comp.hash = HashComponent(comp, ecs, refMap, compToHash);
+            comp.hash = HashComponent(comp, refMap, compToHash);
 
             if (comp.hash === null || comp.hash === '')
             {
@@ -325,7 +334,7 @@ function BuildHashMap(ecs: ECS, refMap: {[index: number]:Component})
     ecs.components.forEach(comp => {
         if (!comp.guid)
         {
-            comp.hash = HashComponent(comp, ecs, refMap, compToHash);
+            comp.hash = HashComponent(comp, refMap, compToHash);
 
             if (comp.hash === null)
             {
@@ -925,16 +934,16 @@ export function DiffECS(left: ECS, right: ECS): Transaction
     
     if (true)
     {
-        console.log(`hash matches: ${hashDiff.matchingHashes}`);
-        console.log(`hash matches: ${left.components.length}`);
-        console.log(`hash matches: ${right.components.length}`);
-        console.log(`hash matches: ${hashDiff.matchingHashes.length}`);
-        console.log(`hash added: ${hashDiff.addedHashes}`);
-        console.log(`hash removed: ${hashDiff.removedHashes}`);
+        console.log(`left components: ${left.components.length}`);
+        console.log(`right components: ${right.components.length}`);
 
-        console.log(`guids matches: ${guidsDiff.matchingGuids}`);
-        console.log(`guids added: ${guidsDiff.addedGuids}`);
-        console.log(`guids removed: ${guidsDiff.removedGuids}`);
+        console.log(`hash matches: ${hashDiff.matchingHashes.length}`);
+        console.log(`hash added: ${hashDiff.addedHashes.length}`);
+        console.log(`hash removed: ${hashDiff.removedHashes.length}`);
+
+        console.log(`guids matches: ${guidsDiff.matchingGuids.length}`);
+        console.log(`guids added: ${guidsDiff.addedGuids.length}`);
+        console.log(`guids removed: ${guidsDiff.removedGuids.length}`);
     }
 
     let lockedReferences = BuildLockedReferences(hashDiff, guidsDiff, refMapLeft, refMapRight);
@@ -1003,7 +1012,52 @@ export function DiffECS(left: ECS, right: ECS): Transaction
             }
         }
     });
-    
+
+    let addedHashes = {};
+    let removedHashes = {};
+
+    let compsForType = {};
+    let compToHash = {};
+    allAddedComponents.forEach((comp) => {
+        addedHashes[HashComponent(comp, null, compToHash, true)] = comp;
+
+        if (!compsForType[ComponentTypeToString(comp.type)]) {
+            compsForType[ComponentTypeToString(comp.type)] = { added: [], removed: [] };
+        }
+
+        compsForType[ComponentTypeToString(comp.type)].added.push(comp);
+    })
+
+    compToHash = {};
+    allRemovedComponents.forEach((compID) => {
+        let comp = refMapLeft[compID];
+        removedHashes[HashComponent(comp, null, compToHash, true)] = comp;
+
+        if (!compsForType[ComponentTypeToString(comp.type)]) {
+            compsForType[ComponentTypeToString(comp.type)] = { added: [], removed: [] };
+        }
+        compsForType[ComponentTypeToString(comp.type)].removed.push(comp);
+    });
+
+    let existingHash = 0;
+    let newHash = 0;
+    Object.keys(addedHashes).forEach((hash) => {
+        if (removedHashes[hash])
+        {
+            existingHash++;
+        }
+        else
+        {
+            newHash++;
+            console.log(hash);
+        }
+    })
+
+    console.log(`Existing ${existingHash}, new: ${newHash}`);
+
+    require("fs").writeFileSync("diff_add_remove.json", JSON.stringify(compsForType, null, 4));    
+    require("fs").writeFileSync("diff_hashes.json", JSON.stringify([addedHashes, removedHashes], null, 4));    
+
 /*
     let allModifiedComponents = guidsDiff.matchingGuids.map((guid) => MakeModifiedComponent(refMapLeft[guidsDiff.guidToRefLeft[guid]], refMapRight[guidsDiff.guidToRefRight[guid]], schemaMap)) as ModifiedComponent[];
     // filter out nulls
