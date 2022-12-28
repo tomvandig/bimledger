@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "watch": {
-    "build-cli": {
+    "build-web": {
       "patterns": [
         "./"
       ],
@@ -15,6 +15,7 @@
   "scripts": {
     "build-cli": "esbuild bl_cli.ts --bundle --platform=node --outfile=bundle.js && node bundle.js",
     "build-test": "esbuild bl_test.ts --bundle --platform=node --outfile=bundle.js && node bundle.js",
+    "build-web": "esbuild bl_web.ts --bundle --outfile=web-bundle.js",
     "watch": "npm-watch"
   },
   "author": "",

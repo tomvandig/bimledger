@@ -326,11 +326,9 @@ export function sortEntities(entities: Entity[]) {
       }
   }
 
-const fs = require("fs");
-
 console.log("Starting...");
 
-export function ParseEXP()
+export function ParseEXP(expString)
 {
     let completeEntityList = new Set();
     completeEntityList.add("FILE_SCHEMA");
@@ -338,9 +336,7 @@ export function ParseEXP()
     completeEntityList.add("FILE_DESCRIPTION");
     let completeifcElementList = new Set();
 
-    let filename = "./IFC4.exp";
-
-    let schemaData = fs.readFileSync(filename).toString();
+    let schemaData = expString;
     let parsed = parseElements(schemaData);
     let entities = sortEntities(parsed.entities);
     let types = parsed.types;

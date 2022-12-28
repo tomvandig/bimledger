@@ -1049,14 +1049,14 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         else
         {
             newHash++;
-            console.log(hash);
+            // console.log(hash);
         }
     })
 
     console.log(`Existing ${existingHash}, new: ${newHash}`);
 
-    require("fs").writeFileSync("diff_add_remove.json", JSON.stringify(compsForType, null, 4));    
-    require("fs").writeFileSync("diff_hashes.json", JSON.stringify([addedHashes, removedHashes], null, 4));    
+    // require("fs").writeFileSync("diff_add_remove.json", JSON.stringify(compsForType, null, 4));    
+    // require("fs").writeFileSync("diff_hashes.json", JSON.stringify([addedHashes, removedHashes], null, 4));    
 
 /*
     let allModifiedComponents = guidsDiff.matchingGuids.map((guid) => MakeModifiedComponent(refMapLeft[guidsDiff.guidToRefLeft[guid]], refMapRight[guidsDiff.guidToRefRight[guid]], schemaMap)) as ModifiedComponent[];
