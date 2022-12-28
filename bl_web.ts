@@ -7,16 +7,44 @@ console.log(`BL web`);
 let ledger: Ledger = { transactions: [] } as Ledger;
 let current_ecs: ECS = new ECS([], []);
 
+function DownloadString(str: string, name: string)
+{
+    const uri = window.URL.createObjectURL(new Blob([str], {
+        type: 'text/plain'
+    }));
+    var link = document.createElement("a");
+    // If you don't know the name or want to use
+    // the webserver default set name = ''
+    link.setAttribute('download', name);
+    link.href = uri;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
 
 document.addEventListener("DOMContentLoaded", function () {
     let outputLog = document.getElementById("outputlog");
+    let schema_select = document.getElementById("select_schema");
+
+    document.getElementById("button_dl_ecs").onclick  = () => {
+        DownloadString(JSON.stringify(current_ecs, null, 4), "ecs.json");
+    };
+
+    document.getElementById("button_dl_ledger").onclick  = () => {
+        DownloadString(JSON.stringify(ledger, null, 4), "ledger.json");
+    };
 
     function log(txt: string)
     {
         outputLog.innerHTML += txt + "<br>";
     }
 
+    log(`Choose a file above, and select the schema of the file`)
+    log(`!!! NOTE: Mixing schemas will make everything explode !!!`)
+
     document.getElementById("fileinput").onchange = function(evt) {
+        let schema = schema_select.value;
+
         var reader = new FileReader();
 
         console.log(`input change`);
@@ -28,37 +56,48 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
             
-            log(`Current ECS has ${current_ecs.definitions.length} definitions`);
-            log(`Current ECS has ${current_ecs.components.length} components`);
+            try{
+                log(``);
+                log(`Current ECS has ${current_ecs.definitions.length} definitions`);
+                log(`Current ECS has ${current_ecs.components.length} components`);
 
-            let filecontent = evt.target.result as string;
+                let filecontent = evt.target.result as string;
 
-            let response = await (await fetch('IFC4.exp')).text();
+                let schemaFileName = schema === "ifc2x3" ? "ifc2x3.exp" : "IFC4.exp";
 
-            log(`Converting IFC file to ECS...`);
-            let modified_ecs = ConvertIFCToECS(filecontent, ParseEXP(response));
-            log(`Done`);
+                log(`Using schema ${schemaFileName}`);
 
-            log(`Added ECS has ${modified_ecs.definitions.length} definitions`);
-            log(`Added ECS has ${modified_ecs.components.length} components`);
-            
-            log(`Creating transaction...`);
-            let transaction = DiffECS(current_ecs, modified_ecs);
-            log(`Done!`);
+                let response = await (await fetch(schemaFileName)).text();
 
-            log(`Transaction has ${transaction.delta.definitions.created.length} created definitions`);
-            log(`Transaction has ${transaction.delta.components.added.length} added components`);
-            log(`Transaction has ${transaction.delta.components.removed.length} removed components`);
-            log(`Transaction has ${transaction.delta.components.modified.length} modified components`);
+                log(`Converting IFC file to ECS...`);
+                let modified_ecs = ConvertIFCToECS(filecontent, ParseEXP(response));
+                log(`Done`);
 
-            log(`Current ECS has ${current_ecs.definitions.length} definitions`);
-            log(`Current ECS has ${current_ecs.components.length} components`);
-            
-            ledger.transactions.push(transaction);
-            
-            log(`Current ledger has ${ledger.transactions.length} transactions`);
+                log(`Added ECS has ${modified_ecs.definitions.length} definitions`);
+                log(`Added ECS has ${modified_ecs.components.length} components`);
+                
+                log(`Creating transaction...`);
+                let transaction = DiffECS(current_ecs, modified_ecs);
+                log(`Done!`);
 
-            current_ecs = BuildECS(ledger);
+                log(`Transaction has ${transaction.delta.definitions.created.length} created definitions`);
+                log(`Transaction has ${transaction.delta.components.added.length} added components`);
+                log(`Transaction has ${transaction.delta.components.removed.length} removed components`);
+                log(`Transaction has ${transaction.delta.components.modified.length} modified components`);
+
+                log(`Current ECS has ${current_ecs.definitions.length} definitions`);
+                log(`Current ECS has ${current_ecs.components.length} components`);
+                
+                ledger.transactions.push(transaction);
+                
+                log(`Current ledger has ${ledger.transactions.length} transactions`);
+
+                current_ecs = BuildECS(ledger);
+            } catch(e)
+            {
+                log(e);
+                log(`Please check if you're using the right schema, otherwise, sorry :-)`);
+            }
         };
 
         reader.readAsText(evt.target.files[0]);
