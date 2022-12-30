@@ -2,6 +2,7 @@
 import { expect } from 'chai';
 import { BuildECS, Component, ComponentAttributeInstance, DiffECS, ECS, Ledger, RehashECS, SetVerbose, VisitAttributes } from './bl_core';
 import { describe, it } from "./crappucino";
+import ExportToIfc from './ecs2ifc';
 import { GetExampleObject, GetExamplePropDefinition, GetExamplePropSetDefinition, MakeArray, MakeAttr, MakeLabel, MakeNumber, MakeRef, MakeSelect, MakeString } from './example';
 import { findSubClasses, ParseEXP } from './exp2ecs';
 import ConvertIFCToECS from './ifc2ecs';
@@ -190,6 +191,63 @@ describe('Unit Tests', function () {
             });
 
             expect(attrs.length).to.equal(8);
+        });
+    });
+});
+
+describe('Unit Tests', function () {
+    describe('Relationship objects', function () {
+        it('Relationships should be properly deduplicated', function () {
+
+            let propDef = GetExamplePropDefinition();
+            let propSetDef = GetExamplePropSetDefinition();
+
+            let ECS1 = new ECS(
+                [propDef, propSetDef],
+                [
+                    GetExampleObject(1, null, propDef, [ MakeAttr("name", MakeString("myprop1")) ]),
+                    GetExampleObject(2, null, propDef, [ MakeAttr("name", MakeString("myprop2")) ]),
+                    GetExampleObject(3, null, propSetDef, [ MakeAttr("properties", MakeArray([MakeRef(1), MakeRef(2)]))] )
+                ]
+            );
+
+            let ECS2 = new ECS(
+                [propDef, propSetDef],
+                [
+                    GetExampleObject(4, null, propDef, [ MakeAttr("name", MakeString("myprop1")) ]),
+                    GetExampleObject(5, null, propDef, [ MakeAttr("name", MakeString("myprop2")) ]),
+                    GetExampleObject(2, null, propSetDef, [ MakeAttr("properties", MakeArray([MakeRef(4), MakeRef(5)]))] )
+                ]
+            );
+            
+            SetVerbose(true);
+            let initialTransaction = DiffECS(ECS1, ECS2);
+
+            console.log(JSON.stringify(initialTransaction, null, 4));
+            
+        });
+    });
+});
+
+describe('Unit Tests', function () {
+    describe('Export to ifc', function () {
+        it('Check export to ifc', function () {
+
+            let propDef = GetExamplePropDefinition();
+            let propSetDef = GetExamplePropSetDefinition();
+
+            let ECS1 = new ECS(
+                [propDef, propSetDef],
+                [
+                    GetExampleObject(1, null, propDef, [ MakeAttr("name", MakeString("myprop1")) ]),
+                    GetExampleObject(2, null, propDef, [ MakeAttr("name", MakeString("myprop2")) ]),
+                    GetExampleObject(3, null, propSetDef, [ MakeAttr("properties", MakeArray([MakeRef(1), MakeRef(2)]))] )
+                ]
+            );
+
+            let stepString = ExportToIfc(ECS1, null);
+
+            console.log(stepString);
         });
     });
 });

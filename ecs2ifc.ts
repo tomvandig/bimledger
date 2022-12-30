@@ -74,7 +74,5 @@ export default function ExportToIfc(ecs: ECS, ids: number[] | null)
 
     let footer = ["ENDSEC;", "END-ISO-10303-21;"].join("\n");
 
-    return `${headerString}
-            ${exportedStepString}
-            ${footer}`;
+    return `${headerString}\n${exportedStepString}\n${footer}`;
 }
