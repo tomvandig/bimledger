@@ -50,9 +50,31 @@ export default function ExportToIfc(ecs: ECS, ids: number[] | null)
     // TODO: filter on type IFC
     let componentsToExport: Component[] = ids ? ids.map((id) => ecs.GetComponentByRef(id)) : ecs.components;
 
-    // TODO: header
+    let description = "exported file description";
+    let name = "exported file name";
+    let tool = "bl";
+    let schema = "ifc2x3";
+
+    let headerString = [];
+    
+    headerString.push(`ISO-10303-21;`);
+    headerString.push(`HEADER;`);
+    headerString.push(`FILE_DESCRIPTION(('${description}'), '2;1');`);
+    headerString.push(`FILE_NAME('${name}', '', (''), (''), '${tool}');`);
+    headerString.push(`FILE_SCHEMA(('${schema}'));`);
+    headerString.push(`ENDSEC;`);
+    headerString.push(`DATA;`);
+
+    //@ts-ignore
+    headerString = headerString.join("\n");
 
     let exportedStepArray: string[] = componentsToExport.map((comp) => ExportComponentToString(comp));
 
-    return exportedStepArray.join("\n");
+    let exportedStepString = exportedStepArray.join("\n");
+
+    let footer = ["ENDSEC;", "END-ISO-10303-21;"].join("\n");
+
+    return `${headerString}
+            ${exportedStepString}
+            ${footer}`;
 }
