@@ -42,11 +42,13 @@ interface ComponentsDelta
     removed: Reference[];
 }
 
+export type AttributeValue = number | string | boolean | ComponentAttributeInstance | ComponentAttributeInstance[];
+
 export interface ComponentAttributeInstance
 {
     type: ComponentAttributeType;
     namedType: string;
-    val: number | string | boolean | ComponentAttributeInstance | ComponentAttributeInstance[];
+    val: AttributeValue;
 }
 
 export interface NamedComponentAttributeInstance
