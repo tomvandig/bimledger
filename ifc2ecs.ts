@@ -73,8 +73,8 @@ class LineParser
         {
             // we always approve this
             return { 
-                type: schemaValue.type,
-                val: null
+                type: ComponentAttributeType.INHERIT,
+                val: "*"
                 } as ComponentAttributeInstance;
         }
 

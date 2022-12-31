@@ -60,6 +60,7 @@ export interface NamedComponentAttributeInstance
 export enum ComponentAttributeType
 {
     NUMBER,
+    INHERIT,
     STRING,
     SELECT,
     ARRAY,

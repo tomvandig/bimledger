@@ -2,11 +2,17 @@ import { AttributeValue, Component, ComponentAttributeInstance, ComponentAttribu
 
 function ExportComponentValueToString(attrInstance: ComponentAttributeInstance)
 {
+    if (attrInstance.val === null)
+    {
+        return "$";
+    }
+
     switch(attrInstance.type)
     {
         case ComponentAttributeType.NUMBER:
         case ComponentAttributeType.LABEL:
         case ComponentAttributeType.BOOLEAN:
+        case ComponentAttributeType.INHERIT:
         case ComponentAttributeType.BINARY:
         case ComponentAttributeType.LOGICAL:
             return `${attrInstance.val}`;
