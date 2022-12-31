@@ -18,6 +18,8 @@ function ExportComponentValueToString(attrInstance: ComponentAttributeInstance)
             return `${attrInstance.val}`;
         case ComponentAttributeType.STRING:
             return `'${attrInstance.val}'`;
+        case ComponentAttributeType.ENUM:
+            return `.${attrInstance.val}.`;
         case ComponentAttributeType.REF:
             return `#${attrInstance.val}`;
         case ComponentAttributeType.SELECT:
@@ -59,7 +61,7 @@ export default function ExportToIfc(ecs: ECS, ids: number[] | null)
     let description = "exported file description";
     let name = "exported file name";
     let tool = "bl";
-    let schema = "ifc2x3";
+    let schema = "IFC2X3";
 
     let headerString = [];
     

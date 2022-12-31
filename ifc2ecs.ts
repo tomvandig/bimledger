@@ -90,8 +90,9 @@ class LineParser
         {
             if (schemaValue.type === ComponentAttributeType.STRING)
             {
-                if (type !== IfcTokenType.STRING && type !== IfcTokenType.ENUM)
+                if (type !== IfcTokenType.STRING)
                 {
+                    console.log(this.data[this.data_ptr++]);
                     throw new Error(`Bad type ${type} found for string`);
                 }
                 else
@@ -99,6 +100,21 @@ class LineParser
                     // type match
                     return { 
                         type: ComponentAttributeType.STRING,
+                        val: this.data[this.data_ptr++]
+                     } as ComponentAttributeInstance;
+                }
+            }
+            else if (schemaValue.type === ComponentAttributeType.ENUM)
+            {
+                if (type !== IfcTokenType.ENUM)
+                {
+                    throw new Error(`Bad type ${type} found for enum`);
+                }
+                else
+                {
+                    // type match
+                    return { 
+                        type: ComponentAttributeType.ENUM,
                         val: this.data[this.data_ptr++]
                      } as ComponentAttributeInstance;
                 }
@@ -349,7 +365,7 @@ export default function ConvertIFCToECS(stringData: string, definitions: Compone
         // we clear the guids of relationships since they don't appear to be consistent between revisions and clutter the diff
         // other contenders for modified guids are: IFCELEMENTQUANTITY, IFCPROPERTYSET
         if (definition.isRelationShip) ClearGuidForComponent(result);
-        if (definition.isIfcOwnerHistory) ClearComponentValues(result);
+        // if (definition.isIfcOwnerHistory) ClearComponentValues(result); // this is now solved by overriding the hash of the ifcownerhistory type
 
         let component: Component = {
             ref: line.id,

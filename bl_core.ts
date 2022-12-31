@@ -62,6 +62,7 @@ export enum ComponentAttributeType
     NUMBER,
     INHERIT,
     STRING,
+    ENUM,
     SELECT,
     ARRAY,
     LABEL,
@@ -251,6 +252,12 @@ function HashComponent(comp: Component, refMap: {[index: number]:Component}, com
     if (compToHash[comp.ref])
     {
         return compToHash[comp.ref];
+    }
+
+    // TODO: too late in the process to reference exact type names
+    if (comp.type[1] === "ifcownerhistory")
+    {
+        return "a";
     }
 
     let hash = [comp.guid, ...comp.type];

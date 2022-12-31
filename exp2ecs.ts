@@ -430,8 +430,7 @@ export function ParseEXP(expString)
             let _type = (propType as Type);
             if (_type.isEnum)
             {
-                // TODO: work with values
-                type = ComponentAttributeType.STRING;
+                type = ComponentAttributeType.ENUM;
             }
             else if (_type.isList)
             {
