@@ -10,12 +10,13 @@ function ExportComponentValueToString(attrInstance: ComponentAttributeInstance)
     switch(attrInstance.type)
     {
         case ComponentAttributeType.NUMBER:
-        case ComponentAttributeType.LABEL:
         case ComponentAttributeType.BOOLEAN:
         case ComponentAttributeType.INHERIT:
         case ComponentAttributeType.BINARY:
         case ComponentAttributeType.LOGICAL:
             return `${attrInstance.val}`;
+        case ComponentAttributeType.LABEL:
+            return `${attrInstance.namedType}(${ExportComponentValueToString(attrInstance.val as ComponentAttributeInstance)})`;
         case ComponentAttributeType.STRING:
             return `'${attrInstance.val}'`;
         case ComponentAttributeType.ENUM:
@@ -39,7 +40,21 @@ function ExportComponentDataToString(componentData: NamedComponentAttributeInsta
 {
     return componentData.map((attrInstance) => {
         // don't care about the name, thats only relevant for the schema
-        return ExportComponentValueToString(attrInstance.val);
+        // check if guid has been removed
+        if (attrInstance.name === "GlobalId" && attrInstance.val && (attrInstance.val.val as string) === '')
+        {
+            var text = "";
+            var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+          
+            for (var i = 0; i < 22; i++)
+              text += possible.charAt(Math.floor(Math.random() * possible.length));
+          
+            return `'${text}'`;
+        }
+        else
+        {
+            return ExportComponentValueToString(attrInstance.val);
+        }
     }).join(",");
 }
 
