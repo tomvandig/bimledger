@@ -1,4 +1,5 @@
 import { BuildECS, DiffECS, ECS, Ledger } from "./bl_core";
+import ExportToIfc from "./ecs2ifc";
 import { ParseEXP } from "./exp2ecs";
 import ConvertIFCToECS from "./ifc2ecs";
 
@@ -32,6 +33,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     document.getElementById("button_dl_ledger").onclick  = () => {
         DownloadString(JSON.stringify(ledger, null, 4), "ledger.json");
+    };
+    
+    document.getElementById("button_dl_ifc").onclick  = () => {
+        DownloadString(ExportToIfc(current_ecs, null), "export.ifc");
     };
 
     function log(txt: string)
@@ -84,15 +89,15 @@ document.addEventListener("DOMContentLoaded", function () {
                 log(`Transaction has ${transaction.delta.components.added.length} added components`);
                 log(`Transaction has ${transaction.delta.components.removed.length} removed components`);
                 log(`Transaction has ${transaction.delta.components.modified.length} modified components`);
-
-                log(`Current ECS has ${current_ecs.definitions.length} definitions`);
-                log(`Current ECS has ${current_ecs.components.length} components`);
                 
                 ledger.transactions.push(transaction);
                 
                 log(`Current ledger has ${ledger.transactions.length} transactions`);
 
                 current_ecs = BuildECS(ledger);
+
+                log(`Current ECS has ${current_ecs.definitions.length} definitions`);
+                log(`Current ECS has ${current_ecs.components.length} components`);
             } catch(e)
             {
                 log(e);
