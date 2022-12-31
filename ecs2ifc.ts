@@ -10,7 +10,6 @@ function ExportComponentValueToString(attrInstance: ComponentAttributeInstance)
     switch(attrInstance.type)
     {
         case ComponentAttributeType.NUMBER:
-        case ComponentAttributeType.BOOLEAN:
         case ComponentAttributeType.INHERIT:
         case ComponentAttributeType.BINARY:
         case ComponentAttributeType.LOGICAL:
@@ -23,6 +22,8 @@ function ExportComponentValueToString(attrInstance: ComponentAttributeInstance)
             return `.${attrInstance.val}.`;
         case ComponentAttributeType.REF:
             return `#${attrInstance.val}`;
+        case ComponentAttributeType.BOOLEAN:
+            return attrInstance.val ? ".T." : ".F.";
         case ComponentAttributeType.SELECT:
             throw new Error(`Unexpected select while exporting to IFC`);
         case ComponentAttributeType.ARRAY:
