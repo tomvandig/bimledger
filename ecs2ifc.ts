@@ -65,7 +65,7 @@ function ExportComponentToString(comp: Component): string
     return `#${comp.ref}=${ifcTypeAsString}(${ExportComponentDataToString(comp.data)});`;
 }
 
-export default function ExportToIfc(ecs: ECS, ids: number[] | null)
+export default function ExportToIfc(ecs: ECS, ids: number[] | null, isIfc2x3: boolean)
 {
     
     // ignore definitions, these are implied 
@@ -77,7 +77,7 @@ export default function ExportToIfc(ecs: ECS, ids: number[] | null)
     let description = "exported file description";
     let name = "exported file name";
     let tool = "bl";
-    let schema = "IFC2X3";
+    let schema = isIfc2x3 ? "IFC2X3" : "IFC4";
 
     let headerString = [];
     

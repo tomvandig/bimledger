@@ -36,7 +36,8 @@ document.addEventListener("DOMContentLoaded", function () {
     };
     
     document.getElementById("button_dl_ifc").onclick  = () => {
-        DownloadString(ExportToIfc(current_ecs, null), "export.ifc");
+        let schema = schema_select.value;
+        DownloadString(ExportToIfc(current_ecs, null, schema === "ifc2x3"), "export.ifc");
     };
 
     function log(txt: string)
