@@ -92,7 +92,6 @@ class LineParser
             {
                 if (type !== IfcTokenType.STRING)
                 {
-                    console.log(this.data[this.data_ptr++]);
                     throw new Error(`Bad type ${type} found for string`);
                 }
                 else
