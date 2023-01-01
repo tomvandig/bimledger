@@ -58,7 +58,7 @@ document.addEventListener("DOMContentLoaded", function () {
         outputLog.innerHTML += txt + "<br>";
     }
 
-    log(`Choose a file above, and select the schema of the file`)
+    log(`Choose a file below, and select the schema of the file`)
     log(`!!! NOTE: Mixing schemas will make everything explode !!!`)
 
     document.getElementById("fileinput").onchange = function(evt) {
@@ -117,6 +117,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 log(e);
                 log(`Please check if you're using the right schema, otherwise, sorry :-)`);
             }
+
+            window.scrollTo(0, document.body.scrollHeight);
         };
 
         reader.readAsText(evt.target.files[0]);

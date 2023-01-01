@@ -599,7 +599,7 @@ export function VisitAttributes(comp: Component, fn: (ComponentAttributeInstance
     })
 }
 
-function GetRefsFromComponent(comp: Component)
+export function GetRefsFromComponent(comp: Component)
 {
     let refs: Reference[] = [];
     VisitAttributes(comp, (attr: ComponentAttributeInstance) => {
