@@ -118,7 +118,7 @@ interface TransactionDelta
     definitions: DefinitionsDelta;
 }
 
-interface Transaction
+export interface Transaction
 {
     date: string;
     hash: string;

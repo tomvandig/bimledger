@@ -2,6 +2,7 @@ import { BuildECS, DiffECS, ECS, Ledger } from "./bl_core";
 import ExportToIfc from "./ecs2ifc";
 import { ParseEXP } from "./exp2ecs";
 import ConvertIFCToECS from "./ifc2ecs";
+import { ExportTransactionAsDeltaIds } from "./Transaction2DeltaIds";
 
 console.log(`BL web`);
 
@@ -34,10 +35,22 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("button_dl_ledger").onclick  = () => {
         DownloadString(JSON.stringify(ledger, null, 4), "ledger.json");
     };
+
+    document.getElementById("button_dl_transaction").onclick  = () => {
+        let lastTransaction = ledger.transactions[ledger.transactions.length - 1];
+        DownloadString(JSON.stringify(lastTransaction, null, 4), "transaction.json");
+    };
     
     document.getElementById("button_dl_ifc").onclick  = () => {
         let schema = schema_select.value;
         DownloadString(ExportToIfc(current_ecs, null, schema === "ifc2x3"), "export.ifc");
+    };
+
+    document.getElementById("button_dl_delta").onclick  = () => {
+        let schema = schema_select.value;
+        let lastTransaction = ledger.transactions[ledger.transactions.length - 1];
+        let ids = ExportTransactionAsDeltaIds(lastTransaction, current_ecs)
+        DownloadString(ExportToIfc(current_ecs, ids, schema === "ifc2x3"), "delta.ifc");
     };
 
     function log(txt: string)
