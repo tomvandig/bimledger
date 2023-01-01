@@ -643,7 +643,7 @@ class ReferenceTree {
     bwdRefs: any;
 }   
 
-function BuildReferenceTree(ecs: ECS)
+export function BuildReferenceTree(ecs: ECS)
 {
     let tree = new ReferenceTree();
 
