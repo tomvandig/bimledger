@@ -918,6 +918,16 @@ function UpdateComponentRefsToMatchLeft(comp: Component, newLeftRefForNewRightRe
     });
 }
 
+function CheckComponent(comp: Component, ecs: ECS)
+{
+    GetRefsFromComponent(comp).forEach((ref) => {
+        if (!ecs.GetComponentByRef(ref)){
+            console.log(comp);
+            throw new Error(`Couldn't find ref ${ref} in component ${comp.ref}`);
+        }
+    })
+}
+
 export function DiffECS(left: ECS, right: ECS): Transaction
 {
     let nextRef = GetMaxRef(left) + 1;
@@ -965,16 +975,6 @@ export function DiffECS(left: ECS, right: ECS): Transaction
     let allModifiedComponents = [];
     let allAddedComponents = [];
 
-    Object.keys(refMapLeft).forEach((refLeft) => {
-        let refRight = invertedLockedReferences[refLeft];
-
-        if (!refRight)
-        {
-            // this ref has been removed
-            allRemovedComponents.push(parseInt(refLeft)); // ???
-        }
-    });
-
     // TODO: look at removed/added component pairs to figure out which references can be carried over from old to new components
     // since we have freedom to use any reference from removed components as we wish, we can simply grab an added component that is most similar
     // reference repair will pick up the changes
@@ -993,6 +993,18 @@ export function DiffECS(left: ECS, right: ECS): Transaction
             newLeftRefForNewRightRef[refRight] = nextRef++;
         }
     });
+
+    // check what can be removed
+    // TODO: fix in transactions
+    // Object.keys(refMapLeft).forEach((refLeft) => {
+    //     let refRight = invertedLockedReferences[refLeft];
+
+    //     if (!refRight)
+    //     {
+    //         // this ref has been removed
+    //         allRemovedComponents.push(parseInt(refLeft)); // ???
+    //     }
+    // });
 
     Object.keys(refMapRight).forEach((refRight) => {
         let refLeft = lockedReferences[refRight];
@@ -1161,6 +1173,11 @@ function ApplyTransaction(ecs: ECS, transaction: Transaction)
 
         ecs.components = ecs.components.filter(e => e.ref !== removedRef);
     });
+
+    // console.log(`checking comps`);
+    // ecs.components.forEach((comp) => {
+    //     CheckComponent(comp, ecs);
+    // })
 }
 
 export function BuildECS(ledger: Ledger)

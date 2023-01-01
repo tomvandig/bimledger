@@ -25,6 +25,9 @@ function GetUpwardsRefs()
 
 export function ExportTransactionAsDeltaIds(transaction: Transaction, ecs: ECS)
 {
+    // TODO: use guids of ifcproduct here, won't work otherwise unless we trim the transaction further
+
+
     let deltaIds: number[] = [];
     let processed = {};
 
@@ -47,7 +50,7 @@ export function ExportTransactionAsDeltaIds(transaction: Transaction, ecs: ECS)
     });
 
     relevantTopLevelIds.forEach((id) => {
-        FindRefsDownward(id, ecs, deltaIds, processed);
+        //FindRefsDownward(id, ecs, deltaIds, processed);
     });
 
     // up dir
@@ -65,7 +68,6 @@ export function ExportTransactionAsDeltaIds(transaction: Transaction, ecs: ECS)
                 if (!processed[ref])
                 {
                     let comp = ecs.GetComponentByRef(ref);
-                    console.log(comp.type);
                    // if (comp.type[1] !== "ifcrelaggregates")
                     {
                         // nextIds.push(ref);

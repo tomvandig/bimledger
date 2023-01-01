@@ -116,6 +116,7 @@ document.addEventListener("DOMContentLoaded", function () {
             {
                 log(e);
                 log(`Please check if you're using the right schema, otherwise, sorry :-)`);
+                throw e;
             }
 
             window.scrollTo(0, document.body.scrollHeight);
