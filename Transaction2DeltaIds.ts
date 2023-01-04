@@ -1,4 +1,4 @@
-import { BuildReferenceTree, ECS, GetRefsFromComponent, Transaction } from "./bl_core";
+import { BuildReferenceTree, ECS, GetRefsFromComponent, ReferenceTree, Transaction } from "./bl_core";
 
 function FindRefsDownward(id: number, ecs: ECS, deltaIds: number[], processed: {})
 {
@@ -21,6 +21,40 @@ function FindRefsDownward(id: number, ecs: ECS, deltaIds: number[], processed: {
 function GetUpwardsRefs()
 {
 
+}
+
+function FindIfcProductForComponent(id: number, ecs: ECS, refTree: ReferenceTree, ifcProductRefs: number[])
+{
+    let comp = ecs.GetComponentByRef(id);
+
+    if (comp.type[1] === "ifcwall")
+    {
+        ifcProductRefs.push(id);
+
+        // stop search here
+        return;
+    }
+
+    let bwdRefs = refTree.bwdRefs[id];
+
+    if (bwdRefs)
+    {
+        bwdRefs.forEach((ref) => {
+            FindIfcProductForComponent(ref, ecs, refTree, ifcProductRefs);
+        });
+    }
+}
+
+function dedupe(objs: any[])
+{
+    let map = {};
+    objs.forEach((d) => map[d] = true);
+    return Object.keys(map);
+}
+
+function dedupeNumbers(objs: any[])
+{
+    return dedupe(objs).map((k) => parseInt(k));
 }
 
 export function ExportTransactionAsDeltaIds(transaction: Transaction, ecs: ECS)
@@ -49,9 +83,15 @@ export function ExportTransactionAsDeltaIds(transaction: Transaction, ecs: ECS)
         processed[comp.ref] = true;
     });
 
+    let ifcProducts = [];
     relevantTopLevelIds.forEach((id) => {
         //FindRefsDownward(id, ecs, deltaIds, processed);
+        FindIfcProductForComponent(id, ecs, refTree, ifcProducts);
     });
+
+    let guids = dedupe(ifcProducts.map((product) => ecs.GetComponentByRef(product).guid).filter(g => g));
+
+    console.log(guids);
 
     // up dir
     let newIds = [...relevantTopLevelIds];
@@ -83,6 +123,5 @@ export function ExportTransactionAsDeltaIds(transaction: Transaction, ecs: ECS)
         newIds = nextIds;
     }
 
-
-    return deltaIds;
+    return dedupeNumbers(deltaIds);
 }

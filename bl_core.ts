@@ -247,7 +247,7 @@ function BuildGuidMap(ecs: ECS)
     return map;
 }
 
-function HashComponent(comp: Component, refMap: {[index: number]:Component}, compToHash: {[index: number]:string}, shallow: boolean = false)
+function HashComponent(comp: Component, refMap: {[index: number]:Component}, compToHash: {[index: number]:string}, shallow: boolean = false, indirection: {} | null = null)
 {
     if (compToHash[comp.ref])
     {
@@ -281,7 +281,14 @@ function HashComponent(comp: Component, refMap: {[index: number]:Component}, com
                 // shallow means we don't follow references
                 if (shallow)
                 {
-                    hash.push(val as any);
+                    if (indirection)
+                    {
+                        hash.push(indirection[val])
+                    }
+                    else
+                    {
+                        hash.push(val as any);
+                    }
                 }
                 else
                 {
@@ -290,7 +297,7 @@ function HashComponent(comp: Component, refMap: {[index: number]:Component}, com
                     {
                         throw new Error(`Unknown component reference ${val}`);
                     }
-                    hash.push(HashComponent(childComp, refMap, compToHash));
+                    hash.push(HashComponent(childComp, refMap, compToHash, false, null));
                 }
             }
         }
@@ -637,7 +644,7 @@ function UpdateDepth(ref: Reference, bwdRefs: any, depthMap: any, depth: number)
     }
 }
 
-class ReferenceTree {
+export class ReferenceTree {
     depthMap: any;
     fwdRefs: any;
     bwdRefs: any;
@@ -980,7 +987,7 @@ export function DiffECS(left: ECS, right: ECS): Transaction
     // reference repair will pick up the changes
     // such a mapping can then be transformed to a component modification, which is probably what the user wants in the end
     let newLeftRefForNewRightRef = {};
-    
+
     Object.keys(refMapRight).forEach((refRight) => {
         let refLeft = lockedReferences[refRight];
 
@@ -990,29 +997,114 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         }
         else
         {
+            // no existing ref found, but maybe we can find it by rehashing
             newLeftRefForNewRightRef[refRight] = nextRef++;
         }
     });
 
-    // check what can be removed
-    // TODO: fix in transactions
-    // Object.keys(refMapLeft).forEach((refLeft) => {
-    //     let refRight = invertedLockedReferences[refLeft];
+    let change = true;
+    while(change)
+    {
+        change = false;
 
-    //     if (!refRight)
-    //     {
-    //         // this ref has been removed
-    //         allRemovedComponents.push(parseInt(refLeft)); // ???
-    //     }
-    // });
+        // check what is no longer in use
+        let leftRefsWithoutRightRef = [];
+        Object.keys(refMapLeft).forEach((refLeft) => {
+            let refRight = invertedLockedReferences[refLeft];
 
+            if (!refRight)
+            {
+                // this ref has been removed
+                leftRefsWithoutRightRef.push(parseInt(refLeft));
+            }
+        });
+        
+        allAddedComponents = [];
+
+        Object.keys(refMapRight).forEach((refRight) => {
+            let refLeft = lockedReferences[refRight];
+
+            if (refLeft)
+            {
+                // this ref is a match!
+                // UpdateComponentRefsToMatchLeft(refMapRight[refRight], newLeftRefForNewRightRef);
+
+                //let modification = MakeModifiedComponent(refMapLeft[refLeft], refMapRight[refRight], schemaMap);
+            // if (modification) allModifiedComponents.push(modification);
+            }
+            else
+            {
+                // this ref is new!
+                let newLeftRef = newLeftRefForNewRightRef[refRight];
+
+                if (!newLeftRef)
+                {
+                    // this is unknown
+                    throw new Error(`Missing mapping to left ref!`);
+                }
+                else
+                {
+                    //UpdateComponentRefsToMatchLeft(refMapRight[refRight], newLeftRefForNewRightRef);
+                    allAddedComponents.push(MakeCreatedComponent(refMapRight[refRight], parseInt(refRight)));
+                }
+            }
+        });
+
+        let shallowLeftHashesWithoutRightRef = {};
+        let compToHash = {};
+        leftRefsWithoutRightRef.forEach((ref) => {
+            shallowLeftHashesWithoutRightRef[HashComponent(refMapLeft[ref], null, compToHash, true)] = refMapLeft[ref];
+        })
+
+        let addedHashes = {};
+        compToHash = {};
+
+        console.log(`aDDED comps ${allAddedComponents.length}`);
+
+        allAddedComponents.forEach((comp) => {
+            addedHashes[HashComponent(comp, null, compToHash, true, newLeftRefForNewRightRef)] = comp;
+        })
+
+        compToHash = {};
+
+        let existingHash = 0;
+        let newHash = 0;
+        Object.keys(addedHashes).forEach((hash) => {
+            if (shallowLeftHashesWithoutRightRef[hash])
+            {
+                change = true;
+
+                // nice, found a match, lets repair the ECS
+                let rightComp = addedHashes[hash];
+                let leftComp = shallowLeftHashesWithoutRightRef[hash];
+                newLeftRefForNewRightRef[rightComp.ref] = leftComp.ref;
+
+                lockedReferences[rightComp.ref] = leftComp.ref;
+                invertedLockedReferences[leftComp.ref] = rightComp.ref;
+
+                existingHash++;
+            }
+            else
+            {
+                newHash++;
+                // console.log(hash);
+            }
+        });
+
+        console.log(`Existing ${existingHash}, new: ${newHash}`);
+    }
+    
+    allAddedComponents = [];
+    allModifiedComponents = [];
+
+    // final pass where we actually build the transaction changes
     Object.keys(refMapRight).forEach((refRight) => {
         let refLeft = lockedReferences[refRight];
 
         if (refLeft)
         {
             // this ref is a match!
-            UpdateComponentRefsToMatchLeft(refMapRight[refRight], newLeftRefForNewRightRef);
+             UpdateComponentRefsToMatchLeft(refMapRight[refRight], newLeftRefForNewRightRef);
 
             let modification = MakeModifiedComponent(refMapLeft[refLeft], refMapRight[refRight], schemaMap);
             if (modification) allModifiedComponents.push(modification);
@@ -1035,47 +1127,6 @@ export function DiffECS(left: ECS, right: ECS): Transaction
         }
     });
 
-    let addedHashes = {};
-    let removedHashes = {};
-
-    let compsForType = {};
-    let compToHash = {};
-    allAddedComponents.forEach((comp) => {
-        addedHashes[HashComponent(comp, null, compToHash, true)] = comp;
-
-        if (!compsForType[ComponentTypeToString(comp.type)]) {
-            compsForType[ComponentTypeToString(comp.type)] = { added: [], removed: [] };
-        }
-
-        compsForType[ComponentTypeToString(comp.type)].added.push(comp);
-    })
-
-    compToHash = {};
-    allRemovedComponents.forEach((compID) => {
-        let comp = refMapLeft[compID];
-        removedHashes[HashComponent(comp, null, compToHash, true)] = comp;
-
-        if (!compsForType[ComponentTypeToString(comp.type)]) {
-            compsForType[ComponentTypeToString(comp.type)] = { added: [], removed: [] };
-        }
-        compsForType[ComponentTypeToString(comp.type)].removed.push(comp);
-    });
-
-    let existingHash = 0;
-    let newHash = 0;
-    Object.keys(addedHashes).forEach((hash) => {
-        if (removedHashes[hash])
-        {
-            existingHash++;
-        }
-        else
-        {
-            newHash++;
-            // console.log(hash);
-        }
-    })
-
-    console.log(`Existing ${existingHash}, new: ${newHash}`);
 
     // require("fs").writeFileSync("diff_add_remove.json", JSON.stringify(compsForType, null, 4));    
     // require("fs").writeFileSync("diff_hashes.json", JSON.stringify([addedHashes, removedHashes], null, 4));    
