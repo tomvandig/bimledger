@@ -208,6 +208,11 @@ export class ECS
         return this.components.filter(c => c.ref === ref)[0];
     }
     
+    GetComponentsByRef(ref: Reference)
+    {
+        return this.components.filter(c => c.ref === ref);
+    }
+    
     GetComponentByGuid(guid: string)
     {
         return this.components.filter(c => c.guid === guid)[0];
@@ -467,7 +472,10 @@ function attributeEqual(left: Component, right: Component, attr: ComponentAttrib
 
 function ApplyComponentModification(comp: Component, mod: ComponentModification)
 {
-    comp.data[mod.attributeName] = mod.newValue;
+    let attrs = comp.data.filter((attr) => attr.name === mod.attributeName);
+    if (attrs.length === 0) throw new Error(`Couldn't find modified attribute ${mod.attributeName} on ${comp.ref}`);
+    let attr = attrs[0];
+    attr.val = mod.newValue;
 }
 
 function BuildModifications(left: Component, right: Component, schema: ComponentSchema)
