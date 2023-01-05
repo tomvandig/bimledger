@@ -20,7 +20,7 @@ interface CreatedComponent
     ref: Reference;
     guid: string | null;
     type: ComponentType;
-    data: any;
+    data: NamedComponentAttributeInstance[];
 }
 
 interface ComponentModification
@@ -834,6 +834,15 @@ function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDiffere
     {
         let nextIteration = [];
 
+        let votes = {}; // map from RIGHT REF ID to MAP OF LEFT REF to COUNT
+
+        function Vote(rightRef: number, leftRef: number)
+        {
+            if (!votes[rightRef]) votes[rightRef] = {};
+            if (!votes[rightRef][leftRef]) votes[rightRef][leftRef] = 0;
+            votes[rightRef][leftRef]++;
+        }
+
         newlyLockedReferences.forEach((refR) => {
             let refL = lockedReferences[refR];
 
@@ -850,6 +859,7 @@ function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDiffere
             let refsL = GetRefsFromComponent(compL);
             let refsR = GetRefsFromComponent(compR);
 
+
             if (refsL.length !== refsR.length)
             {
                 // some set of refs got changed, there is a genuine modification between these two elements
@@ -864,6 +874,8 @@ function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDiffere
                     let refL = refsL[i];
                     let refR = refsR[i];
 
+
+
                     let compL = refMapLeft[refL];
                     let compR = refMapRight[refR];
 
@@ -873,30 +885,32 @@ function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDiffere
                         // differing types, no idea what to do, skip this
                         continue;
                     }
-                    
-                    if (lockedReferences[refR])
-                    {
-                        let lockedRef = lockedReferences[refR];
-                        if (lockedRef === refL)
-                        {
-                            // ref is locked to the same ref as L, all is good
-                        }
-                        else
-                        {
-                            // ref is locked, but NOT to same ref as L, this is a modification of the component
-                            // basically it means that this component references a different component now
-                        }
-                    }
-                    else
-                    {
-                        // no locked reference yet for R, we greedily capture L as the locked reference and assume that's the right thing to do
-                        // if it turns out we're wrong, we're gonna be modifying a bunch of components unnecessarily
-                        lockedReferences[refR] = refL;
-                        nextIteration.push(refR);
-                    }
+
+                    Vote(refR, refL);
                 }
             }
         });
+
+        // we choose the highest vote of all matches for a ref, this way we cause the fewest modifications
+        Object.keys(votes).forEach((rightRef) => {
+            let maxVote = -1;
+            let maxVoteLeftRef = 0;
+            Object.keys(votes[rightRef]).forEach((leftRef) => {
+                let voteCount = votes[rightRef][leftRef];
+                if (voteCount > maxVote)
+                {
+                    maxVote = voteCount;
+                    maxVoteLeftRef = parseInt(leftRef);
+                }
+            })
+
+            if (maxVote)
+            {
+                let refR = parseInt(rightRef);
+                lockedReferences[refR] = maxVoteLeftRef;
+                nextIteration.push(refR);
+            }
+        })
 
         if (nextIteration.length === 0)
         {
@@ -1173,18 +1187,6 @@ export function DiffECS(left: ECS, right: ECS): Transaction
     return transaction;
 }
 
-function Rehash(comp: Component)
-{
-    // TODO: this is so slow might as well do it in python
-    comp.hash = spark.hash(JSON.stringify([comp.guid, comp.type, comp.data]));
-}
-
-export function RehashECS(ecs: ECS)
-{
-    ecs.components.forEach(Rehash);
-    return ecs;
-}
-
 function BuildComponent(ccomp: CreatedComponent)
 {
     let comp: Component = {
@@ -1246,8 +1248,6 @@ export function BuildECS(ledger: Ledger)
     ledger.transactions.forEach((transaction) => {
         ApplyTransaction(ecs, transaction);
     });
-
-    ecs.components.forEach((comp) => Rehash(comp));
 
     return ecs;
 }
