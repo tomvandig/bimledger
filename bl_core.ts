@@ -1,7 +1,7 @@
 import * as spark from "spark-md5";
 
 type Reference = number;
-type ComponentType = string[];
+export type ComponentType = string[];
 
 let verbose = false;
 
@@ -496,7 +496,7 @@ function BuildModifications(left: Component, right: Component, schema: Component
 
 function MakeModifiedComponent(left: Component, right: Component, schemaMap: any)
 {
-    if (left.hash === right.hash)
+    if (left.hash !== "" && left.hash === right.hash)
     {
         return false;
     }
@@ -1126,11 +1126,6 @@ export function DiffECS(left: ECS, right: ECS): Transaction
 
         console.log(`Existing ${existingHash}, new: ${newHash}`);
     }
-
-    guidsDiff.removedGuids.forEach((guid) => {
-        let ref = guidsDiff.guidToRefLeft[guid];
-        allRemovedComponents.push(ref);
-    })
     
     allAddedComponents = [];
     allModifiedComponents = [];

@@ -363,13 +363,15 @@ export default function ConvertIFCToECS(stringData: string, definitions: Compone
 
         // we clear the guids of relationships since they don't appear to be consistent between revisions and clutter the diff
         // other contenders for modified guids are: IFCELEMENTQUANTITY, IFCPROPERTYSET
-        if (definition.isRelationShip) ClearGuidForComponent(result);
+        let isContainedInSpatial = line.type.toLocaleUpperCase() === "IFCRELCONTAINEDINSPATIALSTRUCTURE";
+        let clearGuid = definition.isRelationShip && !isContainedInSpatial;
+        if (clearGuid) ClearGuidForComponent(result);
         // if (definition.isIfcOwnerHistory) ClearComponentValues(result); // this is now solved by overriding the hash of the ifcownerhistory type
 
         let component: Component = {
             ref: line.id,
             hash: "",
-            guid: !definition.isRelationShip ? FindGuidForComponent(result) : null,
+            guid: !clearGuid ? FindGuidForComponent(result) : null,
             type: ["ifc2x3", line.type.toLocaleLowerCase()],
             data: result   
         }
