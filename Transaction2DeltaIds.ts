@@ -86,7 +86,17 @@ export function ExportTransactionAsDeltaIds(transaction: Transaction, ecs: ECS)
     let ifcProducts = [];
     relevantTopLevelIds.forEach((id) => {
         //FindRefsDownward(id, ecs, deltaIds, processed);
-        FindIfcProductForComponent(id, ecs, refTree, ifcProducts);
+        let comp = ecs.GetComponentsByRef(id);
+        let products = [];
+        FindIfcProductForComponent(id, ecs, refTree, products);
+        console.log(comp, products);
+        ifcProducts = [...ifcProducts, ...products];
+    });
+
+    ifcProducts.forEach((id) => {
+        deltaIds.push(id);
+        processed[id] = true;
+        FindRefsDownward(id, ecs, deltaIds, processed);
     });
 
     let guids = dedupe(ifcProducts.map((product) => ecs.GetComponentByRef(product).guid).filter(g => g));
