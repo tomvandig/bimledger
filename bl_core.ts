@@ -820,6 +820,10 @@ function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDiffere
     // for this, we have to start with a list of known reference matches, derive new information to produce new reference matches, and so on
     // the locked references will already tell us all the elements which are equal by-hash or by guid. This narrows down the search space for small edits.
 
+    let invertedLockedReferences = {};
+
+    Object.keys(lockedReferences).forEach((ref) => invertedLockedReferences[lockedReferences[ref]] = ref);
+
     let newlyLockedReferences = [];
     guidsDiff.matchingGuids.forEach((guid) => {
         let refR = guidsDiff.guidToRefRight[guid];
@@ -874,7 +878,11 @@ function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDiffere
                     let refL = refsL[i];
                     let refR = refsR[i];
 
+                    let alreadyLocked = lockedReferences[refR];
+                    let alreadyCovered = invertedLockedReferences[refL];
 
+                    if (alreadyLocked) continue;
+                    if (alreadyCovered) continue;
 
                     let compL = refMapLeft[refL];
                     let compR = refMapRight[refR];
@@ -897,7 +905,9 @@ function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDiffere
             let maxVoteLeftRef = 0;
             Object.keys(votes[rightRef]).forEach((leftRef) => {
                 let voteCount = votes[rightRef][leftRef];
-                if (voteCount > maxVote)
+                let alreadyCovered = invertedLockedReferences[leftRef];
+
+                if (!alreadyCovered && voteCount > maxVote)
                 {
                     maxVote = voteCount;
                     maxVoteLeftRef = parseInt(leftRef);
@@ -908,6 +918,7 @@ function BuildLockedReferences(hashDiff: HashDifference, guidsDiff: GuidsDiffere
             {
                 let refR = parseInt(rightRef);
                 lockedReferences[refR] = maxVoteLeftRef;
+                invertedLockedReferences[maxVoteLeftRef] = refR;
                 nextIteration.push(refR);
             }
         })
@@ -1115,6 +1126,11 @@ export function DiffECS(left: ECS, right: ECS): Transaction
 
         console.log(`Existing ${existingHash}, new: ${newHash}`);
     }
+
+    guidsDiff.removedGuids.forEach((guid) => {
+        let ref = guidsDiff.guidToRefLeft[guid];
+        allRemovedComponents.push(ref);
+    })
     
     allAddedComponents = [];
     allModifiedComponents = [];
