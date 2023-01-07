@@ -149,7 +149,7 @@ export function sortEntities(entities: Entity[]) {
               if (name === "IfcElementType") entity.isIfcRelationship = true; // abuse ifcrelationship for its guid-clearing capabilities
               if (name === "IfcGrid") entity.isIfcRelationship = true; // abuse ifcrelationship for its guid-clearing capabilities
               if (name === "IfcDistributionPort") entity.isIfcRelationship = true; // abuse ifcrelationship for its guid-clearing capabilities
-              if (name === "IfcRoof") entity.isIfcRelationship = true; // abuse ifcrelationship for its guid-clearing capabilities
+              // if (name === "IfcRoof") entity.isIfcRelationship = true; // abuse ifcrelationship for its guid-clearing capabilities
               if (name === "IfcOwnerHistory") entity.isIfcOwnerHistory = true;
 
               readProps = true;
