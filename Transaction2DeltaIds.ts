@@ -1,10 +1,15 @@
 import { BuildReferenceTree, ComponentType, ComponentTypeToString, ECS, GetRefsFromComponent, ReferenceTree, Transaction } from "./bl_core";
 
-function FindRefsDownward(id: number, ecs: ECS, deltaIds: number[], processed: {})
+function FindRefsDownward(id: number, ecs: ECS, deltaIds: number[], processed: {}, typeIsIfcProduct: {} | null = null)
 {
     let comp = ecs.GetComponentByRef(id);
 
     if (!comp) return;
+
+    if (typeIsIfcProduct && typeIsIfcProduct[ComponentTypeToString(comp.type)])
+    {
+        return;
+    }
 
     let refs = GetRefsFromComponent(comp);
     
@@ -13,7 +18,7 @@ function FindRefsDownward(id: number, ecs: ECS, deltaIds: number[], processed: {
         {
             deltaIds.push(ref);
             processed[ref] = true;
-            FindRefsDownward(ref, ecs, deltaIds, processed);
+            FindRefsDownward(ref, ecs, deltaIds, processed, typeIsIfcProduct);
         }
     })
 }
@@ -107,6 +112,8 @@ export function ExportTransactionAsDeltaIds(transaction: Transaction, ecs: ECS)
         ifcProducts = [...ifcProducts, ...products];
     });
 
+    ifcProducts = dedupeNumbers(ifcProducts);
+
     let projects = GetIdsOfType(ecs, ["ifc2x3", "ifcproject"]);
     let sites = GetIdsOfType(ecs, ["ifc2x3", "ifcsite"]);
     let buildings = GetIdsOfType(ecs, ["ifc2x3", "ifcbuilding"]);
@@ -145,18 +152,40 @@ export function ExportTransactionAsDeltaIds(transaction: Transaction, ecs: ECS)
     ifcProducts.forEach((id) => {
         deltaIds.push(id);
         processed[id] = true;
-        if (id === 87385)
-        {
-            debugger;
-        }
         FindRefsDownward(id, ecs, deltaIds, processed);
     });
+    
+
+    /*
+    let dcopy = [...deltaIds];
+    dcopy.forEach((product) => {
+        let bwdRefs = refTree.bwdRefs[product];
+
+        if (!bwdRefs) return;
+
+        // these are relationships
+        bwdRefs.forEach(relationship => {
+            // for each relationship, we may or may not want to look at it
+            let comp = ecs.GetComponentByRef(relationship);
+            if (IsRelevantRelationship(comp.type))
+            {
+                deltaIds.push(relationship);
+                processed[relationship] = true;
+                let total = deltaIds.length;
+                FindRefsDownward(relationship, ecs, deltaIds, processed, typeIsIfcProduct);
+                let added = deltaIds.length - total;
+                console.log(comp.type[1], added);
+            }
+        });
+    });
+    */
 
     let guids = dedupe(ifcProducts.map((product) => ecs.GetComponentByRef(product).guid).filter(g => g));
 
     console.log(guids);
 
     // up dir
+    /*
     let newIds = [...relevantTopLevelIds];
     while(newIds.length > 0)
     {
@@ -181,11 +210,12 @@ export function ExportTransactionAsDeltaIds(transaction: Transaction, ecs: ECS)
 
 
         nextIds.forEach((id) => {
-            FindRefsDownward(id, ecs, deltaIds, processed);
+            FindRefsDownward(id, ecs, deltaIds, processed, typeIsIfcProduct);
         })
 
         newIds = nextIds;
     }
+    */
 
     return dedupeNumbers(deltaIds);
 }
