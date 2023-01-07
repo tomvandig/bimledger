@@ -474,7 +474,7 @@
       } else {
         this.components.forEach((comp) => {
           VisitAttributes(comp, (attr) => {
-            if (attr.type === 8 /* REF */) {
+            if (attr.type === 10 /* REF */) {
               if (attr.val) {
                 let val = attr.val;
                 let replacementRef = equivalenceMap[val];
@@ -497,6 +497,9 @@
     }
     GetComponentByRef(ref) {
       return this.components.filter((c) => c.ref === ref)[0];
+    }
+    GetComponentsByRef(ref) {
+      return this.components.filter((c) => c.ref === ref);
     }
     GetComponentByGuid(guid) {
       return this.components.filter((c) => c.guid === guid)[0];
@@ -525,27 +528,34 @@
     });
     return map;
   }
-  function HashComponent(comp, refMap, compToHash, shallow = false) {
+  function HashComponent(comp, refMap, compToHash, shallow = false, indirection = null) {
     if (compToHash[comp.ref]) {
       return compToHash[comp.ref];
     }
+    if (comp.type[1] === "ifcownerhistory") {
+      return "a";
+    }
     let hash2 = [comp.guid, ...comp.type];
     VisitAttributes(comp, (attr) => {
-      let hasNestedObj = attr.type === 3 /* ARRAY */ || attr.type === 2 /* SELECT */ || attr.type === 4 /* LABEL */;
+      let hasNestedObj = attr.type === 5 /* ARRAY */ || attr.type === 4 /* SELECT */ || attr.type === 6 /* LABEL */;
       if (hasNestedObj) {
         return;
       }
-      if (attr.type === 8 /* REF */) {
+      if (attr.type === 10 /* REF */) {
         if (attr.val && attr.val !== comp.ref) {
           let val = attr.val;
           if (shallow) {
-            hash2.push(val);
+            if (indirection) {
+              hash2.push(indirection[val]);
+            } else {
+              hash2.push(val);
+            }
           } else {
             let childComp = refMap[val];
             if (!childComp) {
               throw new Error(`Unknown component reference ${val}`);
             }
-            hash2.push(HashComponent(childComp, refMap, compToHash));
+            hash2.push(HashComponent(childComp, refMap, compToHash, false, null));
           }
         }
       } else {
@@ -603,7 +613,7 @@
     return ccomp;
   }
   function attributeValueEqual(left, right, attrValue) {
-    if (left.type === 3 /* ARRAY */) {
+    if (left.type === 5 /* ARRAY */) {
       if (!(left.val && right.val)) {
         return left.val === right.val;
       }
@@ -616,7 +626,7 @@
         }
       }
       return true;
-    } else if (left.type === 4 /* LABEL */) {
+    } else if (left.type === 6 /* LABEL */) {
       if (left.namedType !== right.namedType) {
         return false;
       }
@@ -642,7 +652,11 @@
     }
   }
   function ApplyComponentModification(comp, mod) {
-    comp.data[mod.attributeName] = mod.newValue;
+    let attrs = comp.data.filter((attr2) => attr2.name === mod.attributeName);
+    if (attrs.length === 0)
+      throw new Error(`Couldn't find modified attribute ${mod.attributeName} on ${comp.ref}`);
+    let attr = attrs[0];
+    attr.val = mod.newValue;
   }
   function BuildModifications(left, right, schema) {
     let modifications = [];
@@ -657,7 +671,7 @@
     return modifications;
   }
   function MakeModifiedComponent(left, right, schemaMap) {
-    if (left.hash === right.hash) {
+    if (left.hash !== "" && left.hash === right.hash) {
       return false;
     }
     let componentDefinition = schemaMap[ComponentTypeToString(left.type)];
@@ -711,18 +725,18 @@
     return merge;
   }
   function VisitAttribute(attr, fn) {
-    if (attr.type === 3 /* ARRAY */) {
+    if (attr.type === 5 /* ARRAY */) {
       fn(attr);
       if (attr.val) {
         let attributes = attr.val;
         attributes.forEach((ncai) => VisitAttribute(ncai, fn));
       }
-    } else if (attr.type === 4 /* LABEL */) {
+    } else if (attr.type === 6 /* LABEL */) {
       fn(attr);
       if (attr.val) {
         VisitAttribute(attr.val, fn);
       }
-    } else if (attr.type === 2 /* SELECT */) {
+    } else if (attr.type === 4 /* SELECT */) {
       fn(attr);
       if (attr.val) {
         VisitAttribute(attr.val, fn);
@@ -739,13 +753,52 @@
   function GetRefsFromComponent(comp) {
     let refs = [];
     VisitAttributes(comp, (attr) => {
-      if (attr.type === 8 /* REF */) {
+      if (attr.type === 10 /* REF */) {
         if (attr.val) {
           refs.push(attr.val);
         }
       }
     });
     return refs;
+  }
+  function UpdateDepth(ref, bwdRefs, depthMap, depth) {
+    if (!depthMap[ref] || depthMap[ref] < depth) {
+      depthMap[ref] = depth;
+      let bwd = bwdRefs[ref];
+      if (bwd) {
+        bwd.forEach((ref2) => {
+          UpdateDepth(ref2, bwdRefs, depthMap, depth + 1);
+        });
+      }
+    } else {
+    }
+  }
+  var ReferenceTree = class {
+  };
+  function BuildReferenceTree(ecs) {
+    let tree = new ReferenceTree();
+    tree.depthMap = {};
+    tree.fwdRefs = {};
+    tree.bwdRefs = {};
+    ecs.components.forEach((comp) => {
+      let refs = GetRefsFromComponent(comp);
+      tree.fwdRefs[comp.ref] = refs;
+      refs.forEach((ref) => {
+        if (!tree.bwdRefs[ref])
+          tree.bwdRefs[ref] = [];
+        tree.bwdRefs[ref].push(comp.ref);
+      });
+    });
+    ecs.components.forEach((comp) => {
+      let fwd = tree.fwdRefs[comp.ref];
+      if (!fwd || fwd.length === 0) {
+        UpdateDepth(comp.ref, tree.bwdRefs, tree.depthMap, 0);
+      }
+    });
+    if (verbose) {
+      console.log(`---dm`, tree.depthMap);
+    }
+    return tree;
   }
   var HashDifference = class {
     constructor() {
@@ -820,6 +873,8 @@
   }
   function BuildLockedReferences(hashDiff, guidsDiff, refMapLeft, refMapRight) {
     let lockedReferences = BuildInitialLockedReferences(hashDiff, guidsDiff);
+    let invertedLockedReferences = {};
+    Object.keys(lockedReferences).forEach((ref) => invertedLockedReferences[lockedReferences[ref]] = ref);
     let newlyLockedReferences = [];
     guidsDiff.matchingGuids.forEach((guid) => {
       let refR = guidsDiff.guidToRefRight[guid];
@@ -829,7 +884,15 @@
       newlyLockedReferences.push(refR);
     });
     while (true) {
+      let Vote = function(rightRef, leftRef) {
+        if (!votes[rightRef])
+          votes[rightRef] = {};
+        if (!votes[rightRef][leftRef])
+          votes[rightRef][leftRef] = 0;
+        votes[rightRef][leftRef]++;
+      };
       let nextIteration = [];
+      let votes = {};
       newlyLockedReferences.forEach((refR) => {
         let refL = lockedReferences[refR];
         let compL = refMapLeft[refL];
@@ -846,21 +909,37 @@
           for (let i = 0; i < refsL.length; i++) {
             let refL2 = refsL[i];
             let refR2 = refsR[i];
+            let alreadyLocked = lockedReferences[refR2];
+            let alreadyCovered = invertedLockedReferences[refL2];
+            if (alreadyLocked)
+              continue;
+            if (alreadyCovered)
+              continue;
             let compL2 = refMapLeft[refL2];
             let compR2 = refMapRight[refR2];
             if (ComponentTypeToString(compL2.type) !== ComponentTypeToString(compR2.type)) {
               continue;
             }
-            if (lockedReferences[refR2]) {
-              let lockedRef = lockedReferences[refR2];
-              if (lockedRef === refL2) {
-              } else {
-              }
-            } else {
-              lockedReferences[refR2] = refL2;
-              nextIteration.push(refR2);
-            }
+            Vote(refR2, refL2);
           }
+        }
+      });
+      Object.keys(votes).forEach((rightRef) => {
+        let maxVote = -1;
+        let maxVoteLeftRef = 0;
+        Object.keys(votes[rightRef]).forEach((leftRef) => {
+          let voteCount = votes[rightRef][leftRef];
+          let alreadyCovered = invertedLockedReferences[leftRef];
+          if (!alreadyCovered && voteCount > maxVote) {
+            maxVote = voteCount;
+            maxVoteLeftRef = parseInt(leftRef);
+          }
+        });
+        if (maxVote) {
+          let refR = parseInt(rightRef);
+          lockedReferences[refR] = maxVoteLeftRef;
+          invertedLockedReferences[maxVoteLeftRef] = refR;
+          nextIteration.push(refR);
         }
       });
       if (nextIteration.length === 0) {
@@ -872,7 +951,7 @@
   }
   function UpdateComponentRefsToMatchLeft(comp, newLeftRefForNewRightRef) {
     VisitAttributes(comp, (attr) => {
-      if (attr.type === 8 /* REF */) {
+      if (attr.type === 10 /* REF */) {
         if (attr.val) {
           let newRef = newLeftRefForNewRightRef[attr.val];
           if (!newRef) {
@@ -913,12 +992,6 @@
     let allRemovedComponents = [];
     let allModifiedComponents = [];
     let allAddedComponents = [];
-    Object.keys(refMapLeft).forEach((refLeft) => {
-      let refRight = invertedLockedReferences[refLeft];
-      if (!refRight) {
-        allRemovedComponents.push(parseInt(refLeft));
-      }
-    });
     let newLeftRefForNewRightRef = {};
     Object.keys(refMapRight).forEach((refRight) => {
       let refLeft = lockedReferences[refRight];
@@ -928,6 +1001,60 @@
         newLeftRefForNewRightRef[refRight] = nextRef++;
       }
     });
+    let change = true;
+    while (change) {
+      change = false;
+      let leftRefsWithoutRightRef = [];
+      Object.keys(refMapLeft).forEach((refLeft) => {
+        let refRight = invertedLockedReferences[refLeft];
+        if (!refRight) {
+          leftRefsWithoutRightRef.push(parseInt(refLeft));
+        }
+      });
+      allAddedComponents = [];
+      Object.keys(refMapRight).forEach((refRight) => {
+        let refLeft = lockedReferences[refRight];
+        if (refLeft) {
+        } else {
+          let newLeftRef = newLeftRefForNewRightRef[refRight];
+          if (!newLeftRef) {
+            throw new Error(`Missing mapping to left ref!`);
+          } else {
+            allAddedComponents.push(MakeCreatedComponent(refMapRight[refRight], parseInt(refRight)));
+          }
+        }
+      });
+      let shallowLeftHashesWithoutRightRef = {};
+      let compToHash = {};
+      leftRefsWithoutRightRef.forEach((ref) => {
+        shallowLeftHashesWithoutRightRef[HashComponent(refMapLeft[ref], null, compToHash, true)] = refMapLeft[ref];
+      });
+      let addedHashes = {};
+      compToHash = {};
+      console.log(`aDDED comps ${allAddedComponents.length}`);
+      allAddedComponents.forEach((comp) => {
+        addedHashes[HashComponent(comp, null, compToHash, true, newLeftRefForNewRightRef)] = comp;
+      });
+      compToHash = {};
+      let existingHash = 0;
+      let newHash = 0;
+      Object.keys(addedHashes).forEach((hash2) => {
+        if (shallowLeftHashesWithoutRightRef[hash2]) {
+          change = true;
+          let rightComp = addedHashes[hash2];
+          let leftComp = shallowLeftHashesWithoutRightRef[hash2];
+          newLeftRefForNewRightRef[rightComp.ref] = leftComp.ref;
+          lockedReferences[rightComp.ref] = leftComp.ref;
+          invertedLockedReferences[leftComp.ref] = rightComp.ref;
+          existingHash++;
+        } else {
+          newHash++;
+        }
+      });
+      console.log(`Existing ${existingHash}, new: ${newHash}`);
+    }
+    allAddedComponents = [];
+    allModifiedComponents = [];
     Object.keys(refMapRight).forEach((refRight) => {
       let refLeft = lockedReferences[refRight];
       if (refLeft) {
@@ -945,36 +1072,6 @@
         }
       }
     });
-    let addedHashes = {};
-    let removedHashes = {};
-    let compsForType = {};
-    let compToHash = {};
-    allAddedComponents.forEach((comp) => {
-      addedHashes[HashComponent(comp, null, compToHash, true)] = comp;
-      if (!compsForType[ComponentTypeToString(comp.type)]) {
-        compsForType[ComponentTypeToString(comp.type)] = { added: [], removed: [] };
-      }
-      compsForType[ComponentTypeToString(comp.type)].added.push(comp);
-    });
-    compToHash = {};
-    allRemovedComponents.forEach((compID) => {
-      let comp = refMapLeft[compID];
-      removedHashes[HashComponent(comp, null, compToHash, true)] = comp;
-      if (!compsForType[ComponentTypeToString(comp.type)]) {
-        compsForType[ComponentTypeToString(comp.type)] = { added: [], removed: [] };
-      }
-      compsForType[ComponentTypeToString(comp.type)].removed.push(comp);
-    });
-    let existingHash = 0;
-    let newHash = 0;
-    Object.keys(addedHashes).forEach((hash2) => {
-      if (removedHashes[hash2]) {
-        existingHash++;
-      } else {
-        newHash++;
-      }
-    });
-    console.log(`Existing ${existingHash}, new: ${newHash}`);
     let componentsDelta = {
       added: allAddedComponents,
       modified: allModifiedComponents,
@@ -992,9 +1089,6 @@
       delta
     };
     return transaction;
-  }
-  function Rehash(comp) {
-    comp.hash = spark.hash(JSON.stringify([comp.guid, comp.type, comp.data]));
   }
   function BuildComponent(ccomp) {
     let comp = {
@@ -1036,8 +1130,79 @@
     ledger2.transactions.forEach((transaction) => {
       ApplyTransaction(ecs, transaction);
     });
-    ecs.components.forEach((comp) => Rehash(comp));
     return ecs;
+  }
+
+  // ecs2ifc.ts
+  function ExportComponentValueToString(attrInstance) {
+    if (attrInstance.val === null) {
+      return "$";
+    }
+    switch (attrInstance.type) {
+      case 0 /* NUMBER */:
+      case 1 /* INHERIT */:
+      case 8 /* BINARY */:
+      case 9 /* LOGICAL */:
+        return `${attrInstance.val}`;
+      case 6 /* LABEL */:
+        return `${attrInstance.namedType}(${ExportComponentValueToString(attrInstance.val)})`;
+      case 2 /* STRING */:
+        return `'${attrInstance.val}'`;
+      case 3 /* ENUM */:
+        return `.${attrInstance.val}.`;
+      case 10 /* REF */:
+        return `#${attrInstance.val}`;
+      case 7 /* BOOLEAN */:
+        return attrInstance.val ? ".T." : ".F.";
+      case 4 /* SELECT */:
+        throw new Error(`Unexpected select while exporting to IFC`);
+      case 5 /* ARRAY */: {
+        let arr = attrInstance.val;
+        let arrString = arr.map((instance) => ExportComponentValueToString(instance)).join(",");
+        return `(${arrString})`;
+      }
+      default:
+        throw new Error(`Unexpected type while exporting to IFC`);
+    }
+  }
+  function ExportComponentDataToString(componentData) {
+    return componentData.map((attrInstance) => {
+      if (attrInstance.name === "GlobalId" && attrInstance.val && attrInstance.val.val === "") {
+        var text = "";
+        var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        for (var i = 0; i < 22; i++)
+          text += possible.charAt(Math.floor(Math.random() * possible.length));
+        return `'${text}'`;
+      } else {
+        return ExportComponentValueToString(attrInstance.val);
+      }
+    }).join(",");
+  }
+  function ExportComponentToString(comp) {
+    let ifcTypeAsString = comp.type[1].toLocaleUpperCase();
+    return `#${comp.ref}=${ifcTypeAsString}(${ExportComponentDataToString(comp.data)});`;
+  }
+  function ExportToIfc(ecs, ids, isIfc2x3) {
+    let componentsToExport = ids ? ids.map((id) => ecs.GetComponentByRef(id)) : ecs.components;
+    let description = "exported file description";
+    let name = "exported file name";
+    let tool = "bl";
+    let schema = isIfc2x3 ? "IFC2X3" : "IFC4";
+    let headerString = [];
+    headerString.push(`ISO-10303-21;`);
+    headerString.push(`HEADER;`);
+    headerString.push(`FILE_DESCRIPTION(('${description}'), '2;1');`);
+    headerString.push(`FILE_NAME('${name}', '', (''), (''), '${tool}');`);
+    headerString.push(`FILE_SCHEMA(('${schema}'));`);
+    headerString.push(`ENDSEC;`);
+    headerString.push(`DATA;`);
+    headerString = headerString.join("\n");
+    let exportedStepArray = componentsToExport.map((comp) => ExportComponentToString(comp));
+    let exportedStepString = exportedStepArray.join("\n");
+    let footer = ["ENDSEC;", "END-ISO-10303-21;"].join("\n");
+    return `${headerString}
+${exportedStepString}
+${footer}`;
   }
 
   // exp2ecs.ts
@@ -1123,8 +1288,6 @@
         if (name === "IfcGrid")
           entity.isIfcRelationship = true;
         if (name === "IfcDistributionPort")
-          entity.isIfcRelationship = true;
-        if (name === "IfcRoof")
           entity.isIfcRelationship = true;
         if (name === "IfcOwnerHistory")
           entity.isIfcOwnerHistory = true;
@@ -1307,43 +1470,43 @@
       if (typeName === "NUMBER" || typeName === "REAL" || typeName === "INTEGER") {
         return 0 /* NUMBER */;
       } else if (typeName == "STRING") {
-        return 1 /* STRING */;
+        return 2 /* STRING */;
       } else if (typeName == "BOOLEAN") {
-        return 5 /* BOOLEAN */;
+        return 7 /* BOOLEAN */;
       } else if (typeName == "BINARY") {
-        return 6 /* BINARY */;
+        return 8 /* BINARY */;
       } else if (typeName == "LOGICAL") {
-        return 7 /* LOGICAL */;
+        return 9 /* LOGICAL */;
       }
       throw new Error(`Unkonwn prop type: "${typeName}"`);
     }
     function ToChildAttrVal(propType) {
-      let type = 3 /* ARRAY */;
+      let type = 5 /* ARRAY */;
       if (propType.isType) {
         let _type = propType;
         if (_type.isEnum) {
-          type = 1 /* STRING */;
+          type = 3 /* ENUM */;
         } else if (_type.isList) {
           let obj = nameToObj[_type.typeName];
           if (obj && obj.isEntity) {
             return {
-              type: 3 /* ARRAY */,
+              type: 5 /* ARRAY */,
               optional: false,
               child: {
-                type: 8 /* REF */,
+                type: 10 /* REF */,
                 optional: false,
                 child: null
               }
             };
           } else if (obj && obj.isType) {
             return {
-              type: 3 /* ARRAY */,
+              type: 5 /* ARRAY */,
               optional: false,
               child: ToChildAttrVal(obj)
             };
           } else {
             return {
-              type: 3 /* ARRAY */,
+              type: 5 /* ARRAY */,
               optional: false,
               child: {
                 type: PropTypeToAttrType(_type.typeName),
@@ -1354,7 +1517,7 @@
           }
         } else if (_type.isSelect) {
           return {
-            type: 2 /* SELECT */,
+            type: 4 /* SELECT */,
             optional: false,
             child: _type.values.map((val) => ToChildAttrVal(nameToObj[val]))
           };
@@ -1367,7 +1530,7 @@
           }
         }
       } else if (propType.isEntity) {
-        type = 8 /* REF */;
+        type = 10 /* REF */;
       }
       return {
         type,
@@ -1381,10 +1544,10 @@
         let type = PropTypeToAttrType(prop.type);
         if (prop.setOfSet) {
           return {
-            type: 3 /* ARRAY */,
+            type: 5 /* ARRAY */,
             optional: prop.optional,
             child: {
-              type: 3 /* ARRAY */,
+              type: 5 /* ARRAY */,
               optional: false,
               child: {
                 type,
@@ -1395,7 +1558,7 @@
           };
         } else if (prop.set) {
           return {
-            type: 3 /* ARRAY */,
+            type: 5 /* ARRAY */,
             optional: prop.optional,
             child: {
               type,
@@ -1412,17 +1575,17 @@
         }
       } else if (prop.setOfSet) {
         return {
-          type: 3 /* ARRAY */,
+          type: 5 /* ARRAY */,
           optional: prop.optional,
           child: {
-            type: 3 /* ARRAY */,
+            type: 5 /* ARRAY */,
             optional: false,
             child: ToChildAttrVal(propType)
           }
         };
       } else if (prop.set) {
         return {
-          type: 3 /* ARRAY */,
+          type: 5 /* ARRAY */,
           optional: prop.optional,
           child: ToChildAttrVal(propType)
         };
@@ -1483,7 +1646,7 @@
           throw new Error(`No opening brace for named type!`);
         }
         let nestedObj = {
-          type: 4 /* LABEL */,
+          type: 6 /* LABEL */,
           namedType: specificType,
           val: this.ParseAttribute(schemaValue)
         };
@@ -1495,8 +1658,8 @@
       }
       if (type === 0 /* UNKNOWN */) {
         return {
-          type: schemaValue.type,
-          val: null
+          type: 1 /* INHERIT */,
+          val: "*"
         };
       }
       if (schemaValue.optional && type === 6 /* EMPTY */) {
@@ -1505,21 +1668,30 @@
           val: null
         };
       } else {
-        if (schemaValue.type === 1 /* STRING */) {
-          if (type !== 1 /* STRING */ && type !== 3 /* ENUM */) {
+        if (schemaValue.type === 2 /* STRING */) {
+          if (type !== 1 /* STRING */) {
             throw new Error(`Bad type ${type} found for string`);
           } else {
             return {
-              type: 1 /* STRING */,
+              type: 2 /* STRING */,
               val: this.data[this.data_ptr++]
             };
           }
-        } else if (schemaValue.type === 8 /* REF */) {
+        } else if (schemaValue.type === 3 /* ENUM */) {
+          if (type !== 3 /* ENUM */) {
+            throw new Error(`Bad type ${type} found for enum`);
+          } else {
+            return {
+              type: 3 /* ENUM */,
+              val: this.data[this.data_ptr++]
+            };
+          }
+        } else if (schemaValue.type === 10 /* REF */) {
           if (type !== 5 /* REF */) {
             throw new Error(`Bad type ${type} found for ref`);
           } else {
             return {
-              type: 8 /* REF */,
+              type: 10 /* REF */,
               val: this.data[this.data_ptr++]
             };
           }
@@ -1532,25 +1704,25 @@
               val: this.data[this.data_ptr++]
             };
           }
-        } else if (schemaValue.type === 5 /* BOOLEAN */) {
+        } else if (schemaValue.type === 7 /* BOOLEAN */) {
           if (type !== 3 /* ENUM */) {
             throw new Error(`Bad type ${type} found for boolean`);
           } else {
             return {
-              type: 5 /* BOOLEAN */,
+              type: 7 /* BOOLEAN */,
               val: this.data[this.data_ptr++] === "T"
             };
           }
-        } else if (schemaValue.type === 7 /* LOGICAL */) {
+        } else if (schemaValue.type === 9 /* LOGICAL */) {
           if (type !== 3 /* ENUM */) {
             throw new Error(`Bad type ${type} found for boolean`);
           } else {
             return {
-              type: 7 /* LOGICAL */,
+              type: 9 /* LOGICAL */,
               val: this.data[this.data_ptr++] === "T"
             };
           }
-        } else if (schemaValue.type === 2 /* SELECT */) {
+        } else if (schemaValue.type === 4 /* SELECT */) {
           let childTypes = schemaValue.child;
           let attr = null;
           let saved_ptr = this.data_ptr - 1;
@@ -1568,7 +1740,7 @@
           } else {
             return attr;
           }
-        } else if (schemaValue.type === 3 /* ARRAY */) {
+        } else if (schemaValue.type === 5 /* ARRAY */) {
           if (type !== 7 /* SET_BEGIN */) {
             throw new Error(`Bad type ${type} found for array`);
           } else {
@@ -1580,7 +1752,7 @@
             }
             this.data_ptr++;
             return {
-              type: 3 /* ARRAY */,
+              type: 5 /* ARRAY */,
               val: arr
             };
           }
@@ -1626,12 +1798,6 @@
       }
     });
   }
-  function ClearComponentValues(component) {
-    component.forEach((attr) => {
-      attr.val.type = 1 /* STRING */;
-      attr.val.val = "";
-    });
-  }
   function ConvertIFCToECS(stringData, definitions) {
     let tokenizer = new Tokenizer();
     let ptr = 0;
@@ -1660,14 +1826,14 @@
         throw new Error(`Unknown line type ${lineType}`);
       }
       let result = ParseLineToSchema(line, definition);
-      if (definition.isRelationShip)
+      let isContainedInSpatial = line.type.toLocaleUpperCase() === "IFCRELCONTAINEDINSPATIALSTRUCTURE";
+      let clearGuid = definition.isRelationShip && !isContainedInSpatial;
+      if (clearGuid)
         ClearGuidForComponent(result);
-      if (definition.isIfcOwnerHistory)
-        ClearComponentValues(result);
       let component = {
         ref: line.id,
         hash: "",
-        guid: !definition.isRelationShip ? FindGuidForComponent(result) : null,
+        guid: !clearGuid ? FindGuidForComponent(result) : null,
         type: ["ifc2x3", line.type.toLocaleLowerCase()],
         data: result
       };
@@ -1905,6 +2071,120 @@
     }
   };
 
+  // Transaction2DeltaIds.ts
+  function FindRefsDownward(id, ecs, deltaIds, processed, typeIsIfcProduct = null) {
+    let comp = ecs.GetComponentByRef(id);
+    if (!comp)
+      return;
+    if (typeIsIfcProduct && typeIsIfcProduct[ComponentTypeToString(comp.type)]) {
+      return;
+    }
+    let refs = GetRefsFromComponent(comp);
+    refs.forEach((ref) => {
+      if (!processed[ref]) {
+        deltaIds.push(ref);
+        processed[ref] = true;
+        FindRefsDownward(ref, ecs, deltaIds, processed, typeIsIfcProduct);
+      }
+    });
+  }
+  function FindIfcProductForComponent(id, ecs, refTree, ifcProductRefs, typeIsIfcProduct) {
+    let comp = ecs.GetComponentByRef(id);
+    if (!comp) {
+      throw new Error(`Couldn't find component for id ${id}`);
+    }
+    if (typeIsIfcProduct[ComponentTypeToString(comp.type)]) {
+      ifcProductRefs.push(id);
+      return;
+    }
+    let bwdRefs = refTree.bwdRefs[id];
+    if (bwdRefs) {
+      bwdRefs.forEach((ref) => {
+        FindIfcProductForComponent(ref, ecs, refTree, ifcProductRefs, typeIsIfcProduct);
+      });
+    }
+  }
+  function dedupe(objs) {
+    let map = {};
+    objs.forEach((d) => map[d] = true);
+    return Object.keys(map);
+  }
+  function dedupeNumbers(objs) {
+    return dedupe(objs).map((k) => parseInt(k));
+  }
+  function GetIdsOfType(ecs, type) {
+    let ids = [];
+    ecs.components.forEach((comp) => {
+      if (comp.type[1] === type[1]) {
+        ids.push(comp.ref);
+      }
+    });
+    return ids;
+  }
+  function ExportTransactionAsDeltaIds(transaction, ecs) {
+    let typeIsIfcProduct = {};
+    ecs.definitions.forEach((def) => {
+      typeIsIfcProduct[ComponentTypeToString(def.id)] = def.isEntity;
+    });
+    let deltaIds = [];
+    let processed = {};
+    let relevantTopLevelIds = [];
+    let refTree = BuildReferenceTree(ecs);
+    transaction.delta.components.added.forEach((comp) => {
+      relevantTopLevelIds.push(comp.ref);
+      deltaIds.push(comp.ref);
+    });
+    transaction.delta.components.modified.forEach((comp) => {
+      relevantTopLevelIds.push(comp.ref);
+      deltaIds.push(comp.ref);
+    });
+    let ifcProducts = [];
+    relevantTopLevelIds.forEach((id) => {
+      let comp = ecs.GetComponentsByRef(id);
+      let products = [];
+      FindIfcProductForComponent(id, ecs, refTree, products, typeIsIfcProduct);
+      console.log(comp, products);
+      ifcProducts = [...ifcProducts, ...products];
+    });
+    ifcProducts = dedupeNumbers(ifcProducts);
+    let projects = GetIdsOfType(ecs, ["ifc2x3", "ifcproject"]);
+    let sites = GetIdsOfType(ecs, ["ifc2x3", "ifcsite"]);
+    let buildings = GetIdsOfType(ecs, ["ifc2x3", "ifcbuilding"]);
+    let stories = GetIdsOfType(ecs, ["ifc2x3", "ifcbuildingstorey"]);
+    let containedInSpatial = GetIdsOfType(ecs, ["ifc2x3", "ifcrelcontainedinspatialstructure"]);
+    let aggregates = GetIdsOfType(ecs, ["ifc2x3", "ifcrelaggregates"]);
+    sites.forEach((site) => {
+      deltaIds.push(site);
+      FindRefsDownward(site, ecs, deltaIds, processed);
+    });
+    buildings.forEach((building) => {
+      deltaIds.push(building);
+      FindRefsDownward(building, ecs, deltaIds, processed);
+    });
+    stories.forEach((story) => {
+      deltaIds.push(story);
+      FindRefsDownward(story, ecs, deltaIds, processed);
+    });
+    containedInSpatial.forEach((cip) => {
+      deltaIds.push(cip);
+    });
+    aggregates.forEach((aggr) => {
+      deltaIds.push(aggr);
+    });
+    projects.forEach((proj) => {
+      deltaIds.push(proj);
+      FindRefsDownward(proj, ecs, deltaIds, processed);
+    });
+    ifcProducts.forEach((id) => {
+      deltaIds.push(id);
+      processed[id] = true;
+      FindRefsDownward(id, ecs, deltaIds, processed);
+    });
+    let guids = dedupe(ifcProducts.map((product) => ecs.GetComponentByRef(product).guid).filter((g) => g));
+    console.log(guids);
+    return dedupeNumbers(deltaIds);
+  }
+
   // bl_web.ts
   console.log(`BL web`);
   var ledger = { transactions: [] };
@@ -1929,10 +2209,24 @@
     document.getElementById("button_dl_ledger").onclick = () => {
       DownloadString(JSON.stringify(ledger, null, 4), "ledger.json");
     };
+    document.getElementById("button_dl_transaction").onclick = () => {
+      let lastTransaction = ledger.transactions[ledger.transactions.length - 1];
+      DownloadString(JSON.stringify(lastTransaction, null, 4), "transaction.json");
+    };
+    document.getElementById("button_dl_ifc").onclick = () => {
+      let schema = schema_select.value;
+      DownloadString(ExportToIfc(current_ecs, null, schema === "ifc2x3"), "export.ifc");
+    };
+    document.getElementById("button_dl_delta").onclick = () => {
+      let schema = schema_select.value;
+      let lastTransaction = ledger.transactions[ledger.transactions.length - 1];
+      let ids = ExportTransactionAsDeltaIds(lastTransaction, current_ecs);
+      DownloadString(ExportToIfc(current_ecs, ids, schema === "ifc2x3"), "delta.ifc");
+    };
     function log(txt) {
       outputLog.innerHTML += txt + "<br>";
     }
-    log(`Choose a file above, and select the schema of the file`);
+    log(`Choose a file below, and select the schema of the file`);
     log(`!!! NOTE: Mixing schemas will make everything explode !!!`);
     document.getElementById("fileinput").onchange = function(evt) {
       let schema = schema_select.value;
@@ -1965,17 +2259,20 @@
           log(`Transaction has ${transaction.delta.components.added.length} added components`);
           log(`Transaction has ${transaction.delta.components.removed.length} removed components`);
           log(`Transaction has ${transaction.delta.components.modified.length} modified components`);
-          log(`Current ECS has ${current_ecs.definitions.length} definitions`);
-          log(`Current ECS has ${current_ecs.components.length} components`);
           ledger.transactions.push(transaction);
           log(`Current ledger has ${ledger.transactions.length} transactions`);
           current_ecs = BuildECS(ledger);
+          log(`Current ECS has ${current_ecs.definitions.length} definitions`);
+          log(`Current ECS has ${current_ecs.components.length} components`);
         } catch (e) {
           log(e);
           log(`Please check if you're using the right schema, otherwise, sorry :-)`);
+          throw e;
         }
+        window.scrollTo(0, document.body.scrollHeight);
       };
       reader.readAsText(evt.target.files[0]);
     };
   }, false);
 })();
+//# sourceMappingURL=web-bundle.js.map
