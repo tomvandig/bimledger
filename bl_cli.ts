@@ -33,6 +33,7 @@ let STATUS_COMMAND = "status";
 let LAST_COMMAND = "last";
 let RESET_COMMAND = "reset";
 let DELTA_COMMAND = "delta";
+let EXPORT_COMMAND = "export";
 
 function ReadECS()
 {
@@ -102,7 +103,7 @@ else if (command === DELTA_COMMAND)
 {
     if (args.length < 2)
     {
-        console.error(`Expected delta, type "bl help" for info`);
+        console.error(`Expected schema, type "bl help" for info`);
         process.exit(0);
     }
 
@@ -119,6 +120,19 @@ else if (command === DELTA_COMMAND)
     let ifcDelta = ExportToIfc(current_ecs, ids, schemaName === "ifc2x3");
     fs.writeFileSync("delta.ifc", ifcDelta);
 }
+else if (command === EXPORT_COMMAND)
+{
+    if (args.length < 2)
+    {
+        console.error(`Expected schema, type "bl help" for info`);
+        process.exit(0);
+    }
+
+    let schemaName = args[1];
+
+    let ifcString = ExportToIfc(ReadECS(), null, schemaName === "ifc2x3");
+    fs.writeFileSync("export.ifc", ifcString);
+}
 else if (command === RESET_COMMAND)
 {
     console.log(`Cleaning BL dir ${BL_DIR}`);
@@ -131,6 +145,7 @@ else if (command === HELP_COMMAND)
     console.log(`bl.js last -> prints last transaction`);
     console.log(`bl.js delta <ifc2x4/ifc4x0> -> prints last transaction, schema name is required`);
     console.log(`bl.js status -> current status of the ledger`);
+    console.log(`bl.js export -> dumps current ECS to export.ifc`);
 }
 else
 {
