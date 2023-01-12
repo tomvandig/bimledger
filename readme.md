@@ -24,6 +24,20 @@ npm run watch
 
 ```sh
 node bl.js help # prints available commands
+
+# clean the ledger folder
+node bl.js reset
+
+# add a new file, creates an ECS
+node bl.js add "IFC Delta Comparision Demo.ifc" ifc4x0
+# adds a second file, creates an ECS and creates a transaction
+node bl.js add "IFC Delta Comparision Demo_Rev1.ifc" ifc4x0
+# print current ledger status
+node bl.js status
+# print last transaction as ecs
+node bl.js last
+# export last transaction as IFC delta to "delta.ifc"
+node bl.js delta ifc4x0
 ```
 
 ### Web usage

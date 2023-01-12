@@ -34,6 +34,12 @@ let LAST_COMMAND = "last";
 let RESET_COMMAND = "reset";
 let DELTA_COMMAND = "delta";
 
+function ReadECS()
+{
+    let json = JSON.parse(fs.readFileSync(ECS_NAME).toString());
+    return new ECS(json.definitions, json.components);
+}
+
 if (command === ADD_COMMAND)
 {
     if (args.length < 3)
@@ -47,7 +53,7 @@ if (command === ADD_COMMAND)
     console.log(`Adding file: "${file}" with schema "${schemaName}" to ecs`);
     
     console.log(`Reading current ECS`);
-    let current_ecs = fs.existsSync(ECS_NAME) ? JSON.parse(fs.readFileSync(ECS_NAME).toString()) : new ECS([], []);
+    let current_ecs = fs.existsSync(ECS_NAME) ? ReadECS() : new ECS([], []);
     
     let schemaFileName = schemaName === "ifc2x3" ? "ifc2x3.exp" : "IFC4.exp";
     let schema = fs.readFileSync(schemaFileName).toString();
@@ -83,8 +89,6 @@ else if (command === STATUS_COMMAND)
         console.log(` - with ${transaction.delta.components.added.length} added components`);
         console.log(` - with ${transaction.delta.components.modified.length} modified components`);
         console.log(` - with ${transaction.delta.components.removed.length} removed components`);
-
-
     })
 }
 else if (command === LAST_COMMAND)
@@ -96,19 +100,21 @@ else if (command === LAST_COMMAND)
 }
 else if (command === DELTA_COMMAND)
 {
-    let schemaName = args[1];
-    
     if (args.length < 2)
     {
         console.error(`Expected delta, type "bl help" for info`);
         process.exit(0);
     }
+
+    let schemaName = args[1];
+
+    console.log(`Using schema ${schemaName}`);
     
     let ledger = fs.existsSync(LEDGER_NAME) ? JSON.parse(fs.readFileSync(LEDGER_NAME).toString()) as Ledger : { transactions: [] } as Ledger;
     console.log(`Exporting last transaction as delta`);
 
     let transaction = ledger.transactions[ledger.transactions.length - 1];
-    let current_ecs = fs.existsSync(ECS_NAME) ? JSON.parse(fs.readFileSync(ECS_NAME).toString()) : new ECS([], []);
+    let current_ecs = fs.existsSync(ECS_NAME) ? ReadECS() : new ECS([], []);
     let ids = ExportTransactionAsDeltaIds(transaction, current_ecs)
     let ifcDelta = ExportToIfc(current_ecs, ids, schemaName === "ifc2x3");
     fs.writeFileSync("delta.ifc", ifcDelta);

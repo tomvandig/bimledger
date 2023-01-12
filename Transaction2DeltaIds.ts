@@ -108,7 +108,7 @@ export function ExportTransactionAsDeltaIds(transaction: Transaction, ecs: ECS)
         let comp = ecs.GetComponentsByRef(id);
         let products = [];
         FindIfcProductForComponent(id, ecs, refTree, products, typeIsIfcProduct);
-        console.log(comp, products);
+        // console.log(comp, products);
         ifcProducts = [...ifcProducts, ...products];
     });
 
@@ -182,7 +182,7 @@ export function ExportTransactionAsDeltaIds(transaction: Transaction, ecs: ECS)
 
     let guids = dedupe(ifcProducts.map((product) => ecs.GetComponentByRef(product).guid).filter(g => g));
 
-    console.log(guids);
+    console.log("Modifed guids: ", guids);
 
     // up dir
     /*
