@@ -1,6 +1,8 @@
 import { BuildECS, DiffECS, ECS, Ledger } from "./bl_core";
+import ExportToIfc from "./ecs2ifc";
 import { ParseEXP } from "./exp2ecs";
 import ConvertIFCToECS from "./ifc2ecs";
+import { ExportTransactionAsDeltaIds } from "./Transaction2DeltaIds";
 
 let fs = require("fs");
 let path = require("path");
@@ -30,23 +32,28 @@ let HELP_COMMAND = "help";
 let STATUS_COMMAND = "status";
 let LAST_COMMAND = "last";
 let RESET_COMMAND = "reset";
+let DELTA_COMMAND = "delta";
 
 if (command === ADD_COMMAND)
 {
-    if (args.length < 2)
+    if (args.length < 3)
     {
         console.error(`Expected filename, type "bl help" for info`);
         process.exit(0);
     }
 
     let file = args[1];
-    console.log(`Adding file: "${file}" to ecs`);
+    let schemaName = args[2];
+    console.log(`Adding file: "${file}" with schema "${schemaName}" to ecs`);
     
     console.log(`Reading current ECS`);
-    let current_ecs = fs.existsSync(ECS_NAME) ? JSON.parse(fs.readFileSync(ECS_NAME).toString()) : { definitions: [], components: [] } as ECS;
+    let current_ecs = fs.existsSync(ECS_NAME) ? JSON.parse(fs.readFileSync(ECS_NAME).toString()) : new ECS([], []);
     
+    let schemaFileName = schemaName === "ifc2x3" ? "ifc2x3.exp" : "IFC4.exp";
+    let schema = fs.readFileSync(schemaFileName).toString();
+
     console.log(`Converting IFC to ECS`);
-    let modified_ecs = ConvertIFCToECS(fs.readFileSync(file).toString(), ParseEXP());
+    let modified_ecs = ConvertIFCToECS(fs.readFileSync(file).toString(), ParseEXP(schema));
     
     console.log(`Reading ledger`);
     let ledger = fs.existsSync(LEDGER_NAME) ? JSON.parse(fs.readFileSync(LEDGER_NAME).toString()) : { transactions: [] } as Ledger;
@@ -87,6 +94,25 @@ else if (command === LAST_COMMAND)
     console.log(`Last transaction:`);
     console.log(JSON.stringify(ledger.transactions[ledger.transactions.length - 1], null, 4));
 }
+else if (command === DELTA_COMMAND)
+{
+    let schemaName = args[1];
+    
+    if (args.length < 2)
+    {
+        console.error(`Expected filename, type "bl help" for info`);
+        process.exit(0);
+    }
+    
+    let ledger = fs.existsSync(LEDGER_NAME) ? JSON.parse(fs.readFileSync(LEDGER_NAME).toString()) as Ledger : { transactions: [] } as Ledger;
+    console.log(`Exporting last transaction as delta`);
+
+    let transaction = ledger.transactions[ledger.transactions.length - 1];
+    let current_ecs = fs.existsSync(ECS_NAME) ? JSON.parse(fs.readFileSync(ECS_NAME).toString()) : new ECS([], []);
+    let ids = ExportTransactionAsDeltaIds(transaction, current_ecs)
+    let ifcDelta = ExportToIfc(current_ecs, ids, schemaName === "ifc2x3");
+    fs.writeFileSync("delta.ifc", ifcDelta);
+}
 else if (command === RESET_COMMAND)
 {
     console.log(`Cleaning BL dir ${BL_DIR}`);
@@ -94,8 +120,11 @@ else if (command === RESET_COMMAND)
 }
 else if (command === HELP_COMMAND)
 {
-    console.log(`bl add <filename> -> adds file to current ecs, creating transaction in the ledger`);
-    console.log(`bl status -> current status of the ledger`);
+    console.log(`bl.js add <filename> <ifc2x4/ifc4x0> -> adds file to current ecs, creating transaction in the ledger, schema name is required`);
+    console.log(`bl.js reset -> cleans up current bimledger folder`);
+    console.log(`bl.js last -> prints last transaction`);
+    console.log(`bl.js delta <ifc2x4/ifc4x0> -> prints last transaction, schema name is required`);
+    console.log(`bl.js status -> current status of the ledger`);
 }
 else
 {
