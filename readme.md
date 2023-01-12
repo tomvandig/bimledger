@@ -51,6 +51,15 @@ serve .
 # go to localhost:3000
 ```
 
+# Diff
+
+Diff between revit exported files
+
+<img src="./images/diff_rvt.png" width="768">
+
+Same files exported with BL (guids are regenerated)
+
+<img src="./images/diff_bl.png" width="768">
 
 # BIMledger
 BIMledger combines two ideas: git for BIM and ECS for BIM
