@@ -23,7 +23,8 @@ npm run watch
 ### CLI Usage
 
 ```sh
-node bl.js help # prints available commands
+# prints available commands
+node bl.js help 
 
 # clean the ledger folder
 node bl.js reset
