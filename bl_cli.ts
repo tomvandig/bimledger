@@ -100,7 +100,7 @@ else if (command === DELTA_COMMAND)
     
     if (args.length < 2)
     {
-        console.error(`Expected filename, type "bl help" for info`);
+        console.error(`Expected delta, type "bl help" for info`);
         process.exit(0);
     }
     
