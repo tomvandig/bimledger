@@ -1,7 +1,7 @@
 Mozilla Public License Version 2.0
 ==================================
 
-Copyright (c) 2020-2021 bimledger contributors
+Copyright (c) 2022-2023 bimledger contributors
 
 1. Definitions
 --------------
